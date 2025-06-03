@@ -228,15 +228,31 @@ export class HtmlParserService {
   ): string | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
+    if (verbose) {
+      console.log(
+        `🔍 extractSingle - Selector: "${selector}", Type: ${type}, Attribute: ${attribute || 'none'}`,
+      );
+    }
+
     try {
+      let result: string | null;
+
       if (type === 'xpath') {
-        return this.extractSingleXPath(html, selector, attribute, verbose);
+        result = this.extractSingleXPath(html, selector, attribute, verbose);
       } else {
-        return this.extractSingleCSS(html, selector, attribute);
+        result = this.extractSingleCSS(html, selector, attribute);
       }
+
+      if (verbose) {
+        console.log(
+          `✅ extractSingle result: ${result ? `"${result.substring(0, 100)}${result.length > 100 ? '...' : ''}"` : 'null'}`,
+        );
+      }
+
+      return result;
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractSingle:', error);
+        console.error('❌ Error in extractSingle:', error);
       }
       return null;
     }
@@ -254,15 +270,44 @@ export class HtmlParserService {
   ): string[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
+    if (verbose) {
+      console.log(
+        `🔍 extractMultiple - Selector: "${selector}", Type: ${type}, Attribute: ${attribute || 'none'}`,
+      );
+    }
+
     try {
+      let results: string[];
+
       if (type === 'xpath') {
-        return this.extractMultipleXPath(html, selector, attribute, verbose);
+        results = this.extractMultipleXPath(html, selector, attribute, verbose);
       } else {
-        return this.extractMultipleCSS(html, selector, attribute);
+        results = this.extractMultipleCSS(html, selector, attribute);
       }
+
+      if (verbose) {
+        console.log(`✅ extractMultiple found ${results.length} results`);
+        if (results.length > 0 && results.length <= 5) {
+          results.forEach((result, index) => {
+            console.log(
+              `   ${index + 1}: "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
+            );
+          });
+        } else if (results.length > 5) {
+          console.log(`   First 3 results:`);
+          results.slice(0, 3).forEach((result, index) => {
+            console.log(
+              `   ${index + 1}: "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
+            );
+          });
+          console.log(`   ... and ${results.length - 3} more`);
+        }
+      }
+
+      return results;
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractMultiple:', error);
+        console.error('❌ Error in extractMultiple:', error);
       }
       return [];
     }
@@ -330,17 +375,31 @@ export class HtmlParserService {
   ): boolean {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
+    if (verbose) {
+      console.log(
+        `🔍 exists - Checking selector: "${selector}", Type: ${type}`,
+      );
+    }
+
     try {
+      let result: boolean;
+
       if (type === 'xpath') {
         const results = this.evaluateXPath(html, selector, verbose);
-        return results.length > 0;
+        result = results.length > 0;
       } else {
         const $ = cheerio.load(html);
-        return $(selector).length > 0;
+        result = $(selector).length > 0;
       }
+
+      if (verbose) {
+        console.log(`✅ exists result: ${result ? 'Found' : 'Not found'}`);
+      }
+
+      return result;
     } catch (error) {
       if (verbose) {
-        console.error('Error in exists:', error);
+        console.error('❌ Error in exists:', error);
       }
       return false;
     }
@@ -357,17 +416,29 @@ export class HtmlParserService {
   ): number {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
+    if (verbose) {
+      console.log(`🔍 count - Counting selector: "${selector}", Type: ${type}`);
+    }
+
     try {
+      let result: number;
+
       if (type === 'xpath') {
         const results = this.evaluateXPath(html, selector, verbose);
-        return results.length;
+        result = results.length;
       } else {
         const $ = cheerio.load(html);
-        return $(selector).length;
+        result = $(selector).length;
       }
+
+      if (verbose) {
+        console.log(`✅ count result: ${result} elements found`);
+      }
+
+      return result;
     } catch (error) {
       if (verbose) {
-        console.error('Error in count:', error);
+        console.error('❌ Error in count:', error);
       }
       return 0;
     }
@@ -439,6 +510,13 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const results: Record<string, any>[] = [];
 
+    if (verbose) {
+      console.log(
+        `🔍 extractStructuredList - Container: "${containerSelector}", Type: ${containerType}`,
+      );
+      console.log(`📋 Schema fields: ${Object.keys(schema).join(', ')}`);
+    }
+
     try {
       let containers: any[];
 
@@ -449,14 +527,44 @@ export class HtmlParserService {
         containers = $(containerSelector).toArray();
       }
 
-      for (const container of containers) {
+      if (verbose) {
+        console.log(`📦 Found ${containers.length} containers to process`);
+      }
+
+      for (let i = 0; i < containers.length; i++) {
+        const container = containers[i];
+
+        if (verbose) {
+          console.log(
+            `\n📦 Processing container ${i + 1}/${containers.length}`,
+          );
+        }
+
         const containerHTML = this.getElementHTML(container);
         const item = this.extractStructured(containerHTML, schema, { verbose });
         results.push(item);
+
+        if (verbose) {
+          const extractedFields = Object.entries(item)
+            .filter(
+              ([_, value]) =>
+                value !== null && value !== undefined && value !== '',
+            )
+            .map(([key, _]) => key);
+          console.log(
+            `✅ Container ${i + 1} extracted fields: ${extractedFields.join(', ')}`,
+          );
+        }
+      }
+
+      if (verbose) {
+        console.log(
+          `\n🎯 extractStructuredList completed: ${results.length} items extracted`,
+        );
       }
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractStructuredList:', error);
+        console.error('❌ Error in extractStructuredList:', error);
       }
     }
 
@@ -472,19 +580,51 @@ export class HtmlParserService {
       const virtualConsole = new (require('jsdom').VirtualConsole)();
 
       if (!verbose) {
-        // Suppress CSS and other non-critical errors
+        // Suppress all console output when not in verbose mode
         virtualConsole.on('error', () => {});
         virtualConsole.on('warn', () => {});
         virtualConsole.on('info', () => {});
         virtualConsole.on('log', () => {});
       } else {
-        // In verbose mode, still show errors but filter out CSS parsing ones
+        // In verbose mode, filter out CSS parsing errors but show other relevant errors
         virtualConsole.on('error', (error) => {
-          if (!error.toString().includes('Could not parse CSS stylesheet')) {
-            console.error(error);
+          const errorString = error?.toString() || '';
+          const stackString = error?.stack || '';
+
+          // Filter out CSS-related errors
+          const isCSSError =
+            errorString.includes('Could not parse CSS stylesheet') ||
+            errorString.includes('CSS parsing') ||
+            stackString.includes('stylesheets.js') ||
+            stackString.includes('HTMLStyleElement-impl.js') ||
+            stackString.includes('createStylesheet');
+
+          // Only log non-CSS errors in verbose mode
+          if (!isCSSError) {
+            console.error('XPath evaluation error:', error);
           }
         });
-        virtualConsole.on('warn', console.warn);
+
+        // Allow warnings but filter out CSS-related ones
+        virtualConsole.on('warn', (warning) => {
+          const warningString = warning?.toString() || '';
+          const isCSSWarning =
+            warningString.includes('CSS') ||
+            warningString.includes('stylesheet');
+
+          if (!isCSSWarning) {
+            console.warn('XPath evaluation warning:', warning);
+          }
+        });
+
+        // Allow info and log messages in verbose mode
+        virtualConsole.on('info', (...args) => {
+          if (verbose) console.info('XPath info:', ...args);
+        });
+
+        virtualConsole.on('log', (...args) => {
+          if (verbose) console.log('XPath log:', ...args);
+        });
       }
 
       const dom = new JSDOM(html, {
@@ -508,6 +648,12 @@ export class HtmlParserService {
       while (node) {
         nodes.push(node);
         node = result.iterateNext();
+      }
+
+      if (verbose && nodes.length === 0) {
+        console.log(`XPath query "${xpath}" returned no results`);
+      } else if (verbose) {
+        console.log(`XPath query "${xpath}" returned ${nodes.length} results`);
       }
 
       return nodes;
