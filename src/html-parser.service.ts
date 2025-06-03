@@ -55,6 +55,15 @@ export class HtmlParserService {
     retries: 3,
     retryDelay: 1000,
     verbose: false,
+    rejectUnauthorized: true,
+    ignoreSSLErrors: false,
+    maxRedirects: 5,
+    retryOnErrors: {
+      ssl: false,
+      timeout: true,
+      dns: true,
+      connectionRefused: true,
+    },
   };
 
   /**
@@ -98,7 +107,7 @@ export class HtmlParserService {
    * Fetch HTML content from a URL with comprehensive configuration options
    *
    * Supports proxy configuration, custom headers, user agent rotation,
-   * retry logic, and rich response metadata. Automatically handles
+   * retry logic, SSL error handling, and rich response metadata. Automatically handles
    * different proxy types (HTTP, HTTPS, SOCKS4, SOCKS5) and provides
    * detailed error information on failures.
    *
@@ -112,6 +121,10 @@ export class HtmlParserService {
    * @param options.retries - Number of retry attempts on failure (default: 3)
    * @param options.retryDelay - Delay between retries in milliseconds (default: 1000)
    * @param options.verbose - Enable verbose logging for debugging
+   * @param options.rejectUnauthorized - Reject unauthorized SSL certificates (default: true)
+   * @param options.ignoreSSLErrors - Skip SSL certificate verification entirely
+   * @param options.maxRedirects - Maximum number of redirects to follow (default: 5)
+   * @param options.retryOnErrors - Configure retry behavior for specific error types
    *
    * @returns Promise resolving to HtmlFetchResponse with HTML content, headers, and status
    *
@@ -122,23 +135,27 @@ export class HtmlParserService {
    * // Basic usage
    * const response = await parser.fetchHtml('https://example.com');
    *
-   * // With configuration options
-   * const response = await parser.fetchHtml('https://example.com', {
-   *   timeout: 15000,
-   *   useRandomUserAgent: true,
-   *   retries: 5,
-   *   verbose: true,
-   *   headers: {
-   *     'Accept-Language': 'en-US,en;q=0.9'
-   *   }
+   * // Handle SSL errors for sites with invalid certificates
+   * const response = await parser.fetchHtml('https://self-signed-site.com', {
+   *   rejectUnauthorized: false,
+   *   retryOnErrors: { ssl: true }
    * });
    *
-   * // With proxy
-   * const response = await parser.fetchHtml('https://example.com', {
-   *   proxy: {
-   *     url: 'http://proxy.example.com:8080',
-   *     username: 'user',
-   *     password: 'pass'
+   * // Ignore SSL completely (use with caution)
+   * const response = await parser.fetchHtml('https://expired-cert-site.com', {
+   *   ignoreSSLErrors: true
+   * });
+   *
+   * // Robust configuration for unreliable sites
+   * const response = await parser.fetchHtml('https://unreliable-site.com', {
+   *   retries: 5,
+   *   retryDelay: 2000,
+   *   timeout: 15000,
+   *   retryOnErrors: {
+   *     ssl: true,
+   *     timeout: true,
+   *     dns: true,
+   *     connectionRefused: true
    *   }
    * });
    * ```
@@ -153,20 +170,43 @@ export class HtmlParserService {
     const retryDelay =
       config.retryDelay ?? this.defaultOptions.retryDelay ?? 1000;
 
+    if (config.verbose) {
+      console.log(`🌐 Fetching URL: ${url}`);
+      console.log(`🔧 Configuration:`, {
+        timeout: config.timeout,
+        retries: maxRetries,
+        rejectUnauthorized: config.rejectUnauthorized,
+        ignoreSSLErrors: config.ignoreSSLErrors,
+        maxRedirects: config.maxRedirects,
+      });
+    }
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        if (config.verbose && attempt > 0) {
+          console.log(`🔄 Retry attempt ${attempt}/${maxRetries}`);
+        }
+
         // Get user agent - either random or specified
         const userAgent = config.useRandomUserAgent
           ? await this.getRandomUserAgent()
           : config.userAgent;
 
-        // Create axios config
+        // Create axios config with SSL handling
         const axiosConfig: any = {
           timeout: config.timeout,
+          maxRedirects: config.maxRedirects ?? 5,
           headers: {
             'User-Agent': userAgent,
             ...config.headers,
           },
+          // SSL configuration
+          httpsAgent: new (require('https').Agent)({
+            rejectUnauthorized: config.ignoreSSLErrors
+              ? false
+              : (config.rejectUnauthorized ?? true),
+            secureProtocol: config.ignoreSSLErrors ? 'TLSv1_method' : undefined,
+          }),
         };
 
         // Add proxy configuration if provided
@@ -176,6 +216,13 @@ export class HtmlParserService {
         }
 
         const response = await axios.get(url, axiosConfig);
+
+        if (config.verbose) {
+          console.log(
+            `✅ Successfully fetched ${url} (${response.status} ${response.statusText})`,
+          );
+        }
+
         return {
           data: response.data,
           headers: this.normalizeHeaders(response.headers),
@@ -184,17 +231,50 @@ export class HtmlParserService {
         };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        const errorInfo = this.categorizeError(lastError);
 
-        // If this is not the last attempt, wait before retrying
-        if (attempt < maxRetries) {
+        if (config.verbose) {
+          console.log(
+            `❌ Attempt ${attempt + 1} failed: ${errorInfo.type} - ${lastError.message}`,
+          );
+        }
+
+        // Check if we should retry based on error type
+        const shouldRetry = this.shouldRetryOnError(errorInfo, config);
+
+        if (config.verbose) {
+          console.log(
+            `🤔 Should retry: ${shouldRetry}, Attempts left: ${maxRetries - attempt}`,
+          );
+        }
+
+        // If this is not the last attempt and we should retry this error type
+        if (attempt < maxRetries && shouldRetry) {
+          if (config.verbose) {
+            console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+          }
           await this.delay(retryDelay);
           continue;
+        }
+
+        // If we shouldn't retry this error type, break early
+        if (!shouldRetry) {
+          if (config.verbose) {
+            console.log(`🚫 Not retrying ${errorInfo.type} error`);
+          }
+          break;
         }
       }
     }
 
+    // Enhanced error message with categorized error info
+    const errorInfo = lastError
+      ? this.categorizeError(lastError)
+      : { type: 'unknown', description: 'Unknown error' };
     throw new Error(
-      `Failed to fetch HTML from ${url} after ${maxRetries + 1} attempts: ${lastError?.message || 'Unknown error'}`,
+      `Failed to fetch HTML from ${url} after ${maxRetries + 1} attempts. ` +
+        `Error type: ${errorInfo.type}. ${errorInfo.description}. ` +
+        `Last error: ${lastError?.message || 'Unknown error'}`,
     );
   }
 
@@ -396,17 +476,26 @@ export class HtmlParserService {
    * const titleCSS = parser.extractSingle(html, 'h1#title', 'css');
    * // Result: "Welcome"
    *
+   * // With type safety and transformation
+   * const id = parser.extractSingle<number>(html, '//div/@data-id', 'xpath', undefined, {
+   *   transform: (value: string) => parseInt(value)
+   * });
+   * // Result: number | null
+   *
    * // With verbose logging
    * const result = parser.extractSingle(html, '//h1/text()', 'xpath', undefined, { verbose: true });
    * ```
    */
-  extractSingle(
+  extractSingle<T = string>(
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
-    options?: { verbose?: boolean },
-  ): string | null {
+    options?: {
+      verbose?: boolean;
+      transform?: (value: string) => T;
+    },
+  ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose) {
@@ -430,7 +519,13 @@ export class HtmlParserService {
         );
       }
 
-      return result;
+      // Apply transformation if provided and result exists
+      if (result !== null && options?.transform) {
+        return options.transform(result);
+      }
+
+      // Return as T if no transform (assumes T extends string when no transform)
+      return result as T | null;
     } catch (error) {
       if (verbose) {
         console.error('❌ Error in extractSingle:', error);
@@ -477,17 +572,26 @@ export class HtmlParserService {
    * const linksCSS = parser.extractMultiple(html, 'li a', 'css');
    * // Result: ["Page 1", "Page 2", "Page 3"]
    *
+   * // With type safety and transformation
+   * const ids = parser.extractMultiple<number>(html, '//li/@data-id', 'xpath', undefined, {
+   *   transform: (value: string) => parseInt(value)
+   * });
+   * // Result: number[]
+   *
    * // With verbose logging
    * const results = parser.extractMultiple(html, '//li', 'xpath', undefined, { verbose: true });
    * ```
    */
-  extractMultiple(
+  extractMultiple<T = string>(
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
-    options?: { verbose?: boolean },
-  ): string[] {
+    options?: {
+      verbose?: boolean;
+      transform?: (value: string) => T;
+    },
+  ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose) {
@@ -524,7 +628,13 @@ export class HtmlParserService {
         }
       }
 
-      return results;
+      // Apply transformation if provided
+      if (options?.transform) {
+        return results.map((result) => options.transform!(result));
+      }
+
+      // Return as T[] if no transform (assumes T extends string when no transform)
+      return results as T[];
     } catch (error) {
       if (verbose) {
         console.error('❌ Error in extractMultiple:', error);
@@ -560,24 +670,43 @@ export class HtmlParserService {
    * const description = parser.extractText(html, 'p', 'css');
    * // Result: "Description text"
    *
+   * // With type safety and transformation
+   * const wordCount = parser.extractText<number>(html, '//p', 'xpath', {
+   *   transform: (text: string) => text.split(' ').length
+   * });
+   * // Result: number | null
+   *
    * // With verbose logging
    * const text = parser.extractText(html, '//p/text()', 'xpath', { verbose: true });
    * ```
    */
-  extractText(
+  extractText<T = string>(
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
-    options?: { verbose?: boolean },
-  ): string | null {
+    options?: {
+      verbose?: boolean;
+      transform?: (value: string) => T;
+    },
+  ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     try {
+      let result: string | null;
+
       if (type === 'xpath') {
-        return this.extractSingleXPath(html, selector, undefined, verbose);
+        result = this.extractSingleXPath(html, selector, undefined, verbose);
       } else {
-        return this.extractSingleCSS(html, selector);
+        result = this.extractSingleCSS(html, selector);
       }
+
+      // Apply transformation if provided and result exists
+      if (result !== null && options?.transform) {
+        return options.transform(result);
+      }
+
+      // Return as T if no transform (assumes T extends string when no transform)
+      return result as T | null;
     } catch (error) {
       if (verbose) {
         console.error('Error in extractText:', error);
@@ -623,23 +752,42 @@ export class HtmlParserService {
    * // Using CSS selector
    * const hrefs = parser.extractAttributes(html, 'nav a', 'href', 'css');
    * // Result: ["/home", "/about", "/contact"]
+   *
+   * // With type safety and transformation
+   * const ids = parser.extractAttributes<number>(html, '//img', 'data-id', 'xpath', {
+   *   transform: (value: string) => parseInt(value)
+   * });
+   * // Result: number[]
    * ```
    */
-  extractAttributes(
+  extractAttributes<T = string>(
     html: string,
     selector: string,
     attribute: string,
     type: 'xpath' | 'css' = 'xpath',
-    options?: { verbose?: boolean },
-  ): string[] {
+    options?: {
+      verbose?: boolean;
+      transform?: (value: string) => T;
+    },
+  ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     try {
+      let results: string[];
+
       if (type === 'xpath') {
-        return this.extractMultipleXPath(html, selector, attribute, verbose);
+        results = this.extractMultipleXPath(html, selector, attribute, verbose);
       } else {
-        return this.extractMultipleCSS(html, selector, attribute);
+        results = this.extractMultipleCSS(html, selector, attribute);
       }
+
+      // Apply transformation if provided
+      if (options?.transform) {
+        return results.map((result) => options.transform!(result));
+      }
+
+      // Return as T[] if no transform (assumes T extends string when no transform)
+      return results as T[];
     } catch (error) {
       if (verbose) {
         console.error('Error in extractAttributes:', error);
@@ -834,7 +982,15 @@ export class HtmlParserService {
    *   </article>
    * `;
    *
-   * const productSchema = {
+   * // Define typed interface
+   * interface Product {
+   *   title: string;
+   *   price: number;
+   *   image: string;
+   *   rating: number;
+   * }
+   *
+   * const productSchema: ExtractionSchema<Product> = {
    *   title: {
    *     selector: '//h1/text()',
    *     type: 'xpath'
@@ -857,8 +1013,9 @@ export class HtmlParserService {
    *   }
    * };
    *
-   * const product = parser.extractStructured(html, productSchema);
-   * // Result: {
+   * const product = parser.extractStructured<Product>(html, productSchema);
+   * // Result: Product type with full type safety
+   * // {
    * //   title: "Product Name",
    * //   price: 29.99,
    * //   image: "/image.jpg",
@@ -866,11 +1023,11 @@ export class HtmlParserService {
    * // }
    * ```
    */
-  extractStructured(
+  extractStructured<T = Record<string, any>>(
     html: string,
-    schema: ExtractionSchema,
+    schema: ExtractionSchema<T>,
     options?: { verbose?: boolean },
-  ): Record<string, any> {
+  ): T {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const result: Record<string, any> = {};
 
@@ -913,7 +1070,7 @@ export class HtmlParserService {
       }
     }
 
-    return result;
+    return result as T;
   }
 
   /**
@@ -950,7 +1107,14 @@ export class HtmlParserService {
    *   </div>
    * `;
    *
-   * const productSchema = {
+   * // Define typed interface
+   * interface Product {
+   *   name: string;
+   *   price: number;
+   *   image: string;
+   * }
+   *
+   * const productSchema: ExtractionSchema<Product> = {
    *   name: {
    *     selector: './/h3/text()',
    *     type: 'xpath'
@@ -967,19 +1131,20 @@ export class HtmlParserService {
    *   }
    * };
    *
-   * const products = parser.extractStructuredList(
+   * const products = parser.extractStructuredList<Product>(
    *   html,
    *   '//div[@class="product"]',
    *   productSchema
    * );
    *
-   * // Result: [
+   * // Result: Product[] with full type safety
+   * // [
    * //   { name: "Product A", price: 19.99, image: "/a.jpg" },
    * //   { name: "Product B", price: 29.99, image: "/b.jpg" }
    * // ]
    *
    * // Using CSS selector for containers
-   * const productsCSS = parser.extractStructuredList(
+   * const productsCSS = parser.extractStructuredList<Product>(
    *   html,
    *   '.product',
    *   productSchema,
@@ -987,15 +1152,15 @@ export class HtmlParserService {
    * );
    * ```
    */
-  extractStructuredList(
+  extractStructuredList<T = Record<string, any>>(
     html: string,
     containerSelector: string,
-    schema: ExtractionSchema,
+    schema: ExtractionSchema<T>,
     containerType: 'xpath' | 'css' = 'xpath',
     options?: { verbose?: boolean },
-  ): Record<string, any>[] {
+  ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
-    const results: Record<string, any>[] = [];
+    const results: T[] = [];
 
     if (verbose) {
       console.log(
@@ -1028,11 +1193,13 @@ export class HtmlParserService {
         }
 
         const containerHTML = this.getElementHTML(container);
-        const item = this.extractStructured(containerHTML, schema, { verbose });
+        const item = this.extractStructured<T>(containerHTML, schema, {
+          verbose,
+        });
         results.push(item);
 
         if (verbose) {
-          const extractedFields = Object.entries(item)
+          const extractedFields = Object.entries(item as Record<string, any>)
             .filter(
               ([_, value]) =>
                 value !== null && value !== undefined && value !== '',
@@ -1352,5 +1519,152 @@ export class HtmlParserService {
       }
     }
     return normalizedHeaders;
+  }
+
+  /**
+   * Categorize error types for better handling and retry logic
+   *
+   * @param error - The error to categorize
+   * @returns Object with error type and description
+   */
+  private categorizeError(error: Error): { type: string; description: string } {
+    const message = error.message.toLowerCase();
+
+    // SSL/TLS errors
+    if (
+      message.includes('self signed certificate') ||
+      message.includes('unable to verify the first certificate') ||
+      message.includes('certificate has expired') ||
+      message.includes('cert authority invalid') ||
+      message.includes('ssl')
+    ) {
+      return {
+        type: 'ssl',
+        description:
+          'SSL certificate error - try setting rejectUnauthorized: false or ignoreSSLErrors: true',
+      };
+    }
+
+    // Connection timeout errors
+    if (message.includes('timeout') || message.includes('etimedout')) {
+      return {
+        type: 'timeout',
+        description:
+          'Connection timeout - try increasing timeout value or retry delay',
+      };
+    }
+
+    // DNS resolution errors
+    if (message.includes('enotfound') || message.includes('getaddrinfo')) {
+      return {
+        type: 'dns',
+        description:
+          'DNS resolution failed - domain might be dead or unreachable',
+      };
+    }
+
+    // Connection refused errors
+    if (
+      message.includes('econnrefused') ||
+      message.includes('connection refused')
+    ) {
+      return {
+        type: 'connectionRefused',
+        description:
+          'Connection refused - server might be down or blocking requests',
+      };
+    }
+
+    // Network unreachable
+    if (
+      message.includes('enetunreach') ||
+      message.includes('network unreachable')
+    ) {
+      return {
+        type: 'networkUnreachable',
+        description:
+          'Network unreachable - check internet connection or proxy settings',
+      };
+    }
+
+    // Socket hang up
+    if (message.includes('socket hang up') || message.includes('econnreset')) {
+      return {
+        type: 'connectionReset',
+        description:
+          'Connection reset by server - try with different user agent or proxy',
+      };
+    }
+
+    // Rate limiting or blocked
+    if (message.includes('429') || message.includes('rate limit')) {
+      return {
+        type: 'rateLimited',
+        description:
+          'Rate limited - increase retry delay or use proxy rotation',
+      };
+    }
+
+    // HTTP errors
+    if (message.includes('request failed with status code')) {
+      const statusMatch = message.match(/status code (\d+)/);
+      const status = statusMatch ? statusMatch[1] : 'unknown';
+      return {
+        type: 'http',
+        description: `HTTP error ${status} - check if the URL is correct and accessible`,
+      };
+    }
+
+    // Default unknown error
+    return {
+      type: 'unknown',
+      description: 'Unknown error - check URL and network connectivity',
+    };
+  }
+
+  /**
+   * Determine if an error should trigger a retry based on configuration
+   *
+   * @param errorInfo - Categorized error information
+   * @param config - Parser configuration options
+   * @returns Whether to retry the request
+   */
+  private shouldRetryOnError(
+    errorInfo: { type: string },
+    config: HtmlParserOptions,
+  ): boolean {
+    const retryConfig =
+      config.retryOnErrors || this.defaultOptions.retryOnErrors || {};
+
+    switch (errorInfo.type) {
+      case 'ssl':
+        return retryConfig.ssl === true;
+
+      case 'timeout':
+        return retryConfig.timeout === true;
+
+      case 'dns':
+        return retryConfig.dns === true;
+
+      case 'connectionRefused':
+        return retryConfig.connectionRefused === true;
+
+      case 'connectionReset':
+      case 'networkUnreachable':
+        // Always retry these as they might be temporary
+        return true;
+
+      case 'rateLimited':
+        // Don't retry rate limiting immediately - user should handle this
+        return false;
+
+      case 'http':
+        // Don't retry HTTP errors by default (404, 500, etc.)
+        return false;
+
+      default:
+        // Retry unknown errors by default
+        return true;
+    }
   }
 }

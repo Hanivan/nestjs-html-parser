@@ -868,6 +868,819 @@ describe('HtmlParserService', () => {
   });
 });
 
+// TypeScript Generic Types Tests
+describe('HtmlParserService - Generic Types', () => {
+  let service: HtmlParserService;
+
+  // Test HTML content for generic type testing
+  const testHtml = `
+    <html>
+      <head>
+        <title>Test Page</title>
+        <meta name="author" content="John Doe">
+        <meta name="publish-date" content="2024-01-15">
+      </head>
+      <body>
+        <div class="container">
+          <h1 id="main-title">Main Title</h1>
+          <p class="content" data-words="150">This is test content with some words.</p>
+          <span class="price" data-value="29.99">$29.99</span>
+          <span class="rating" data-score="4.5">4.5 stars</span>
+          <div class="status" data-active="true">Active</div>
+          <div class="count" data-views="1250">1,250 views</div>
+          
+          <ul class="tags">
+            <li class="tag">javascript</li>
+            <li class="tag">typescript</li>
+            <li class="tag">testing</li>
+          </ul>
+          
+          <div class="images">
+            <img src="/img1.jpg" alt="Image 1" data-id="1">
+            <img src="/img2.jpg" alt="Image 2" data-id="2">
+            <img src="/img3.jpg" alt="Image 3" data-id="3">
+          </div>
+          
+          <article class="post" data-id="123">
+            <h2>Article Title</h2>
+            <span class="author">Jane Smith</span>
+            <time datetime="2024-01-15T10:30:00Z">2024-01-15</time>
+            <div class="content">Article content here</div>
+            <span class="likes" data-count="89">89</span>
+            <span class="published" data-status="true">Published</span>
+          </article>
+          
+          <article class="post" data-id="124">
+            <h2>Second Article</h2>
+            <span class="author">Bob Wilson</span>
+            <time datetime="2024-01-16T14:20:00Z">2024-01-16</time>
+            <div class="content">More content here</div>
+            <span class="likes" data-count="156">156</span>
+            <span class="published" data-status="false">Draft</span>
+          </article>
+          
+          <div class="product" data-id="501">
+            <h3>Wireless Mouse</h3>
+            <span class="price">$29.99</span>
+            <span class="rating" data-score="4.2">4.2</span>
+            <span class="reviews" data-count="89">89 reviews</span>
+            <span class="stock" data-available="true">In Stock</span>
+            <span class="category">Electronics</span>
+          </div>
+          
+          <div class="product" data-id="502">
+            <h3>Keyboard</h3>
+            <span class="price">$79.99</span>
+            <span class="rating" data-score="4.7">4.7</span>
+            <span class="reviews" data-count="156">156 reviews</span>
+            <span class="stock" data-available="false">Out of Stock</span>
+            <span class="category">Electronics</span>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [HtmlParserService],
+    }).compile();
+
+    service = module.get<HtmlParserService>(HtmlParserService);
+  });
+
+  describe('extractSingle with generic types', () => {
+    it('should return string by default', () => {
+      const title = service.extractSingle(testHtml, '//title/text()');
+      expect(typeof title).toBe('string');
+      expect(title).toBe('Test Page');
+    });
+
+    it('should return string with explicit generic type', () => {
+      const title = service.extractSingle<string>(testHtml, '//title/text()');
+      expect(typeof title).toBe('string');
+      expect(title).toBe('Test Page');
+    });
+
+    it('should transform to number type', () => {
+      const price = service.extractSingle<number>(
+        testHtml,
+        '//span[@class="price"]',
+        'xpath',
+        'data-value',
+        {
+          transform: (value: string) => parseFloat(value),
+        },
+      );
+      expect(typeof price).toBe('number');
+      expect(price).toBe(29.99);
+    });
+
+    it('should transform to boolean type', () => {
+      const isActive = service.extractSingle<boolean>(
+        testHtml,
+        '//div[@class="status"]',
+        'xpath',
+        'data-active',
+        {
+          transform: (value: string) => value === 'true',
+        },
+      );
+      expect(typeof isActive).toBe('boolean');
+      expect(isActive).toBe(true);
+    });
+
+    it('should transform to Date type', () => {
+      const publishDate = service.extractSingle<Date>(
+        testHtml,
+        '//time',
+        'xpath',
+        'datetime',
+        {
+          transform: (value: string) => new Date(value),
+        },
+      );
+      expect(publishDate).toBeInstanceOf(Date);
+      expect(publishDate?.getFullYear()).toBe(2024);
+    });
+
+    it('should transform to custom object type', () => {
+      interface PriceInfo {
+        value: number;
+        currency: string;
+        formatted: string;
+      }
+
+      const priceInfo = service.extractSingle<PriceInfo>(
+        testHtml,
+        '//span[@class="price"]/text()',
+        'xpath',
+        undefined,
+        {
+          transform: (value: string) => {
+            const numValue = parseFloat(value.replace('$', ''));
+            return {
+              value: numValue,
+              currency: 'USD',
+              formatted: value,
+            };
+          },
+        },
+      );
+
+      expect(typeof priceInfo).toBe('object');
+      expect(priceInfo?.value).toBe(29.99);
+      expect(priceInfo?.currency).toBe('USD');
+      expect(priceInfo?.formatted).toBe('$29.99');
+    });
+
+    it('should return null for non-existent elements', () => {
+      const result = service.extractSingle<number>(
+        testHtml,
+        '//nonexistent',
+        'xpath',
+        undefined,
+        {
+          transform: (value: string) => parseInt(value),
+        },
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('extractMultiple with generic types', () => {
+    it('should return string array by default', () => {
+      const tags = service.extractMultiple(
+        testHtml,
+        '//li[@class="tag"]/text()',
+      );
+      expect(Array.isArray(tags)).toBe(true);
+      expect(tags.every((tag) => typeof tag === 'string')).toBe(true);
+      expect(tags).toEqual(['javascript', 'typescript', 'testing']);
+    });
+
+    it('should return string array with explicit generic type', () => {
+      const tags = service.extractMultiple<string>(
+        testHtml,
+        '//li[@class="tag"]/text()',
+      );
+      expect(Array.isArray(tags)).toBe(true);
+      expect(tags.every((tag) => typeof tag === 'string')).toBe(true);
+      expect(tags).toEqual(['javascript', 'typescript', 'testing']);
+    });
+
+    it('should transform to number array', () => {
+      const ids = service.extractMultiple<number>(
+        testHtml,
+        '//img',
+        'xpath',
+        'data-id',
+        {
+          transform: (value: string) => parseInt(value),
+        },
+      );
+      expect(Array.isArray(ids)).toBe(true);
+      expect(ids.every((id) => typeof id === 'number')).toBe(true);
+      expect(ids).toEqual([1, 2, 3]);
+    });
+
+    it('should transform to boolean array', () => {
+      const stockStatus = service.extractMultiple<boolean>(
+        testHtml,
+        '//span[@class="stock"]',
+        'xpath',
+        'data-available',
+        {
+          transform: (value: string) => value === 'true',
+        },
+      );
+      expect(Array.isArray(stockStatus)).toBe(true);
+      expect(stockStatus.every((status) => typeof status === 'boolean')).toBe(
+        true,
+      );
+      expect(stockStatus).toEqual([true, false]);
+    });
+
+    it('should transform to Date array', () => {
+      const dates = service.extractMultiple<Date>(
+        testHtml,
+        '//time',
+        'xpath',
+        'datetime',
+        {
+          transform: (value: string) => new Date(value),
+        },
+      );
+      expect(Array.isArray(dates)).toBe(true);
+      expect(dates.every((date) => date instanceof Date)).toBe(true);
+      expect(dates).toHaveLength(2);
+      expect(dates[0].getFullYear()).toBe(2024);
+    });
+
+    it('should return empty array for non-existent elements', () => {
+      const result = service.extractMultiple<number>(
+        testHtml,
+        '//nonexistent',
+        'xpath',
+        undefined,
+        {
+          transform: (value: string) => parseInt(value),
+        },
+      );
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('extractText with generic types', () => {
+    it('should return string by default', () => {
+      const title = service.extractText(testHtml, '//h1[@id="main-title"]');
+      expect(typeof title).toBe('string');
+      expect(title).toBe('Main Title');
+    });
+
+    it('should transform to number type', () => {
+      const wordCount = service.extractText<number>(
+        testHtml,
+        '//p[@class="content"]',
+        'xpath',
+        {
+          transform: (text: string) => text.split(' ').length,
+        },
+      );
+      expect(typeof wordCount).toBe('number');
+      expect(wordCount).toBeGreaterThan(0);
+    });
+
+    it('should transform to custom type', () => {
+      interface TextAnalysis {
+        text: string;
+        wordCount: number;
+        charCount: number;
+      }
+
+      const analysis = service.extractText<TextAnalysis>(
+        testHtml,
+        '//p[@class="content"]',
+        'xpath',
+        {
+          transform: (text: string) => ({
+            text: text,
+            wordCount: text.split(' ').length,
+            charCount: text.length,
+          }),
+        },
+      );
+
+      expect(typeof analysis).toBe('object');
+      expect(analysis?.wordCount).toBeGreaterThan(0);
+      expect(analysis?.charCount).toBeGreaterThan(0);
+      expect(analysis?.text).toContain('test content');
+    });
+  });
+
+  describe('extractAttributes with generic types', () => {
+    it('should return string array by default', () => {
+      const sources = service.extractAttributes(testHtml, '//img', 'src');
+      expect(Array.isArray(sources)).toBe(true);
+      expect(sources.every((src) => typeof src === 'string')).toBe(true);
+      expect(sources).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
+    });
+
+    it('should transform to number array', () => {
+      const ids = service.extractAttributes<number>(
+        testHtml,
+        '//img',
+        'data-id',
+        'xpath',
+        {
+          transform: (value: string) => parseInt(value),
+        },
+      );
+      expect(Array.isArray(ids)).toBe(true);
+      expect(ids.every((id) => typeof id === 'number')).toBe(true);
+      expect(ids).toEqual([1, 2, 3]);
+    });
+
+    it('should transform to custom object array', () => {
+      interface ImageInfo {
+        id: number;
+        src: string;
+      }
+
+      // This would require a more complex setup, but demonstrates the concept
+      const imageIds = service.extractAttributes<number>(
+        testHtml,
+        '//img',
+        'data-id',
+        'xpath',
+        {
+          transform: (value: string) => parseInt(value),
+        },
+      );
+
+      expect(Array.isArray(imageIds)).toBe(true);
+      expect(imageIds).toEqual([1, 2, 3]);
+    });
+  });
+
+  describe('extractStructured with generic types', () => {
+    interface Article {
+      title: string;
+      author: string;
+      publishDate: Date;
+      likes: number;
+      isPublished: boolean;
+      id: number;
+    }
+
+    it('should extract with full type safety', () => {
+      const articleSchema: ExtractionSchema<Article> = {
+        title: {
+          selector: './/h2/text()',
+          type: 'xpath',
+        },
+        author: {
+          selector: './/span[@class="author"]/text()',
+          type: 'xpath',
+        },
+        publishDate: {
+          selector: './/time',
+          type: 'xpath',
+          attribute: 'datetime',
+          transform: (value: string) => new Date(value),
+        },
+        likes: {
+          selector: './/span[@class="likes"]',
+          type: 'xpath',
+          attribute: 'data-count',
+          transform: (value: string) => parseInt(value),
+        },
+        isPublished: {
+          selector: './/span[@class="published"]',
+          type: 'xpath',
+          attribute: 'data-status',
+          transform: (value: string) => value === 'true',
+        },
+        id: {
+          selector: './/@data-id',
+          type: 'xpath',
+          transform: (value: string) => parseInt(value),
+        },
+      };
+
+      // Extract the first article's HTML content
+      const firstArticleHtml = service.extractSingle(
+        testHtml,
+        '(//article[@class="post"])[1]',
+      );
+
+      // For testing purposes, we'll extract directly from the test HTML
+      // but focus on the first article
+      const firstArticles = service.extractStructuredList<Article>(
+        testHtml,
+        '//article[@class="post"]',
+        articleSchema,
+      );
+
+      const article = firstArticles[0];
+
+      expect(typeof article.title).toBe('string');
+      expect(typeof article.author).toBe('string');
+      expect(article.publishDate).toBeInstanceOf(Date);
+      expect(typeof article.likes).toBe('number');
+      expect(typeof article.isPublished).toBe('boolean');
+      expect(typeof article.id).toBe('number');
+
+      expect(article.title).toBe('Article Title');
+      expect(article.author).toBe('Jane Smith');
+      expect(article.likes).toBe(89);
+      expect(article.isPublished).toBe(true);
+      expect(article.id).toBe(123);
+    });
+
+    interface Product {
+      name: string;
+      price: number;
+      rating: number;
+      reviewCount: number;
+      inStock: boolean;
+      category: string;
+    }
+
+    it('should work with different schema types', () => {
+      const productSchema: ExtractionSchema<Product> = {
+        name: {
+          selector: './/h3/text()',
+          type: 'xpath',
+        },
+        price: {
+          selector: './/span[@class="price"]/text()',
+          type: 'xpath',
+          transform: (value: string) => parseFloat(value.replace('$', '')),
+        },
+        rating: {
+          selector: './/span[@class="rating"]',
+          type: 'xpath',
+          attribute: 'data-score',
+          transform: (value: string) => parseFloat(value),
+        },
+        reviewCount: {
+          selector: './/span[@class="reviews"]',
+          type: 'xpath',
+          attribute: 'data-count',
+          transform: (value: string) => parseInt(value),
+        },
+        inStock: {
+          selector: './/span[@class="stock"]',
+          type: 'xpath',
+          attribute: 'data-available',
+          transform: (value: string) => value === 'true',
+        },
+        category: {
+          selector: './/span[@class="category"]/text()',
+          type: 'xpath',
+        },
+      };
+
+      // Use extractStructuredList to get the first product
+      const products = service.extractStructuredList<Product>(
+        testHtml,
+        '//div[@class="product"]',
+        productSchema,
+      );
+
+      const product = products[0];
+
+      expect(typeof product.name).toBe('string');
+      expect(typeof product.price).toBe('number');
+      expect(typeof product.rating).toBe('number');
+      expect(typeof product.reviewCount).toBe('number');
+      expect(typeof product.inStock).toBe('boolean');
+      expect(typeof product.category).toBe('string');
+
+      expect(product.name).toBe('Wireless Mouse');
+      expect(product.price).toBe(29.99);
+      expect(product.rating).toBe(4.2);
+      expect(product.reviewCount).toBe(89);
+      expect(product.inStock).toBe(true);
+      expect(product.category).toBe('Electronics');
+    });
+  });
+
+  describe('extractStructuredList with generic types', () => {
+    interface Article {
+      title: string;
+      author: string;
+      publishDate: Date;
+      likes: number;
+      isPublished: boolean;
+      id: number;
+    }
+
+    it('should extract typed list of articles', () => {
+      const articleSchema: ExtractionSchema<Article> = {
+        title: {
+          selector: './/h2/text()',
+          type: 'xpath',
+        },
+        author: {
+          selector: './/span[@class="author"]/text()',
+          type: 'xpath',
+        },
+        publishDate: {
+          selector: './/time',
+          type: 'xpath',
+          attribute: 'datetime',
+          transform: (value: string) => new Date(value),
+        },
+        likes: {
+          selector: './/span[@class="likes"]',
+          type: 'xpath',
+          attribute: 'data-count',
+          transform: (value: string) => parseInt(value),
+        },
+        isPublished: {
+          selector: './/span[@class="published"]',
+          type: 'xpath',
+          attribute: 'data-status',
+          transform: (value: string) => value === 'true',
+        },
+        id: {
+          selector: './/@data-id',
+          type: 'xpath',
+          transform: (value: string) => parseInt(value),
+        },
+      };
+
+      const articles = service.extractStructuredList<Article>(
+        testHtml,
+        '//article[@class="post"]',
+        articleSchema,
+      );
+
+      expect(Array.isArray(articles)).toBe(true);
+      expect(articles).toHaveLength(2);
+
+      const firstArticle = articles[0];
+      expect(typeof firstArticle.title).toBe('string');
+      expect(typeof firstArticle.author).toBe('string');
+      expect(firstArticle.publishDate).toBeInstanceOf(Date);
+      expect(typeof firstArticle.likes).toBe('number');
+      expect(typeof firstArticle.isPublished).toBe('boolean');
+      expect(typeof firstArticle.id).toBe('number');
+
+      expect(firstArticle.title).toBe('Article Title');
+      expect(firstArticle.author).toBe('Jane Smith');
+      expect(firstArticle.likes).toBe(89);
+      expect(firstArticle.isPublished).toBe(true);
+      expect(firstArticle.id).toBe(123);
+
+      const secondArticle = articles[1];
+      expect(secondArticle.title).toBe('Second Article');
+      expect(secondArticle.author).toBe('Bob Wilson');
+      expect(secondArticle.likes).toBe(156);
+      expect(secondArticle.isPublished).toBe(false);
+      expect(secondArticle.id).toBe(124);
+    });
+
+    interface Product {
+      name: string;
+      price: number;
+      rating: number;
+      reviewCount: number;
+      inStock: boolean;
+      category: string;
+    }
+
+    it('should extract typed list of products', () => {
+      const productSchema: ExtractionSchema<Product> = {
+        name: {
+          selector: './/h3/text()',
+          type: 'xpath',
+        },
+        price: {
+          selector: './/span[@class="price"]/text()',
+          type: 'xpath',
+          transform: (value: string) => parseFloat(value.replace('$', '')),
+        },
+        rating: {
+          selector: './/span[@class="rating"]',
+          type: 'xpath',
+          attribute: 'data-score',
+          transform: (value: string) => parseFloat(value),
+        },
+        reviewCount: {
+          selector: './/span[@class="reviews"]',
+          type: 'xpath',
+          attribute: 'data-count',
+          transform: (value: string) => parseInt(value),
+        },
+        inStock: {
+          selector: './/span[@class="stock"]',
+          type: 'xpath',
+          attribute: 'data-available',
+          transform: (value: string) => value === 'true',
+        },
+        category: {
+          selector: './/span[@class="category"]/text()',
+          type: 'xpath',
+        },
+      };
+
+      const products = service.extractStructuredList<Product>(
+        testHtml,
+        '//div[@class="product"]',
+        productSchema,
+      );
+
+      expect(Array.isArray(products)).toBe(true);
+      expect(products).toHaveLength(2);
+
+      const firstProduct = products[0];
+      expect(typeof firstProduct.name).toBe('string');
+      expect(typeof firstProduct.price).toBe('number');
+      expect(typeof firstProduct.rating).toBe('number');
+      expect(typeof firstProduct.reviewCount).toBe('number');
+      expect(typeof firstProduct.inStock).toBe('boolean');
+      expect(typeof firstProduct.category).toBe('string');
+
+      expect(firstProduct.name).toBe('Wireless Mouse');
+      expect(firstProduct.price).toBe(29.99);
+      expect(firstProduct.rating).toBe(4.2);
+      expect(firstProduct.reviewCount).toBe(89);
+      expect(firstProduct.inStock).toBe(true);
+      expect(firstProduct.category).toBe('Electronics');
+
+      const secondProduct = products[1];
+      expect(secondProduct.name).toBe('Keyboard');
+      expect(secondProduct.price).toBe(79.99);
+      expect(secondProduct.rating).toBe(4.7);
+      expect(secondProduct.reviewCount).toBe(156);
+      expect(secondProduct.inStock).toBe(false);
+      expect(secondProduct.category).toBe('Electronics');
+    });
+
+    it('should return empty typed array for non-existent containers', () => {
+      interface TestType {
+        value: string;
+      }
+
+      const schema: ExtractionSchema<TestType> = {
+        value: {
+          selector: './/text()',
+          type: 'xpath',
+        },
+      };
+
+      const result = service.extractStructuredList<TestType>(
+        testHtml,
+        '//nonexistent',
+        schema,
+      );
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('Generic type analytics and operations', () => {
+    interface Product {
+      name: string;
+      price: number;
+      rating: number;
+      reviewCount: number;
+      inStock: boolean;
+      category: string;
+    }
+
+    it('should enable type-safe analytics on extracted data', () => {
+      const productSchema: ExtractionSchema<Product> = {
+        name: {
+          selector: './/h3/text()',
+          type: 'xpath',
+        },
+        price: {
+          selector: './/span[@class="price"]/text()',
+          type: 'xpath',
+          transform: (value: string) => parseFloat(value.replace('$', '')),
+        },
+        rating: {
+          selector: './/span[@class="rating"]',
+          type: 'xpath',
+          attribute: 'data-score',
+          transform: (value: string) => parseFloat(value),
+        },
+        reviewCount: {
+          selector: './/span[@class="reviews"]',
+          type: 'xpath',
+          attribute: 'data-count',
+          transform: (value: string) => parseInt(value),
+        },
+        inStock: {
+          selector: './/span[@class="stock"]',
+          type: 'xpath',
+          attribute: 'data-available',
+          transform: (value: string) => value === 'true',
+        },
+        category: {
+          selector: './/span[@class="category"]/text()',
+          type: 'xpath',
+        },
+      };
+
+      const products = service.extractStructuredList<Product>(
+        testHtml,
+        '//div[@class="product"]',
+        productSchema,
+      );
+
+      // Type-safe analytics
+      const totalProducts = products.length;
+      const averagePrice =
+        products.reduce((sum, p) => sum + p.price, 0) / totalProducts;
+      const averageRating =
+        products.reduce((sum, p) => sum + p.rating, 0) / totalProducts;
+      const inStockCount = products.filter((p) => p.inStock).length;
+      const totalReviews = products.reduce((sum, p) => sum + p.reviewCount, 0);
+      const categories = [...new Set(products.map((p) => p.category))];
+      const maxPrice = Math.max(...products.map((p) => p.price));
+      const minPrice = Math.min(...products.map((p) => p.price));
+
+      expect(typeof totalProducts).toBe('number');
+      expect(typeof averagePrice).toBe('number');
+      expect(typeof averageRating).toBe('number');
+      expect(typeof inStockCount).toBe('number');
+      expect(typeof totalReviews).toBe('number');
+      expect(Array.isArray(categories)).toBe(true);
+      expect(typeof maxPrice).toBe('number');
+      expect(typeof minPrice).toBe('number');
+
+      expect(totalProducts).toBe(2);
+      expect(averagePrice).toBeCloseTo(54.99, 2);
+      expect(averageRating).toBe(4.45);
+      expect(inStockCount).toBe(1);
+      expect(totalReviews).toBe(245);
+      expect(categories).toEqual(['Electronics']);
+      expect(maxPrice).toBe(79.99);
+      expect(minPrice).toBe(29.99);
+    });
+  });
+
+  describe('Transform function edge cases', () => {
+    it('should handle transform function errors gracefully', () => {
+      const result = service.extractSingle<number>(
+        testHtml,
+        '//title/text()',
+        'xpath',
+        undefined,
+        {
+          transform: (value: string) => {
+            throw new Error('Transform error');
+          },
+        },
+      );
+      // Should not crash the application
+      expect(result).toBeDefined();
+    });
+
+    it('should handle complex transformation chains', () => {
+      interface ComplexType {
+        original: string;
+        processed: string;
+        length: number;
+        hash: number;
+      }
+
+      const result = service.extractSingle<ComplexType>(
+        testHtml,
+        '//title/text()',
+        'xpath',
+        undefined,
+        {
+          transform: (value: string) => ({
+            original: value,
+            processed: value.toLowerCase().replace(/\s+/g, '-'),
+            length: value.length,
+            hash: value
+              .split('')
+              .reduce(
+                (hash, char) => (hash << 5) - hash + char.charCodeAt(0),
+                0,
+              ),
+          }),
+        },
+      );
+
+      expect(typeof result).toBe('object');
+      expect(result?.original).toBe('Test Page');
+      expect(result?.processed).toBe('test-page');
+      expect(result?.length).toBe(9);
+      expect(typeof result?.hash).toBe('number');
+    });
+  });
+});
+
 // Mock HTML for fallback when live site is unavailable
 function getMockHackerNewsHtml(): string {
   return `

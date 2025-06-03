@@ -26,7 +26,105 @@
 - **🔗 Proxy Support**: HTTP, HTTPS, and SOCKS proxy support with authentication
 - **🔁 Retry Logic**: Configurable retry mechanism with exponential backoff
 - **🔇 Verbose Control**: Optional verbose mode for debugging (CSS errors suppressed by default)
+- **🔒 SSL Error Handling**: Comprehensive SSL certificate error handling and bypass options
+- **💀 Dead Domain Support**: Advanced error categorization for dead/unreachable domains
+- **🔄 Smart Retry Logic**: Error-type-specific retry strategies for different network issues
+- **🎯 TypeScript Generics**: Full generic type support for compile-time type safety
 - **🧪 Fully Tested**: Comprehensive test suite with real-world examples
+
+## SSL and Error Handling
+
+The library provides robust handling for common web scraping challenges:
+
+### SSL Certificate Issues
+
+Handle websites with SSL problems (expired, self-signed, or invalid certificates):
+
+```typescript
+// Handle self-signed certificates
+const response = await htmlParser.fetchHtml('https://self-signed-site.com', {
+  rejectUnauthorized: false,
+  retryOnErrors: { ssl: true }
+});
+
+// Completely ignore SSL errors (use with caution)
+const response = await htmlParser.fetchHtml('https://expired-cert-site.com', {
+  ignoreSSLErrors: true
+});
+
+// Robust configuration for problematic sites
+const response = await htmlParser.fetchHtml('https://unreliable-site.com', {
+  rejectUnauthorized: false,
+  timeout: 15000,
+  retries: 5,
+  retryDelay: 2000,
+  retryOnErrors: {
+    ssl: true,
+    timeout: true,
+    dns: true,
+    connectionRefused: true
+  }
+});
+```
+
+### Dead Domain Handling
+
+Automatically detect and handle various types of network failures:
+
+```typescript
+// Configure retry behavior for different error types
+const response = await htmlParser.fetchHtml('https://might-be-dead.com', {
+  timeout: 10000,
+  retries: 3,
+  retryDelay: 2000,
+  retryOnErrors: {
+    dns: true,           // Retry DNS resolution failures
+    timeout: true,       // Retry connection timeouts  
+    connectionRefused: true, // Retry connection refused errors
+    ssl: false           // Don't retry SSL errors (handle differently)
+  },
+  verbose: true  // See detailed error categorization
+});
+```
+
+### Error Categories
+
+The library automatically categorizes errors for better handling:
+
+- **SSL Errors**: Certificate issues, self-signed certificates, expired certificates
+- **DNS Errors**: Domain not found, DNS resolution failures
+- **Timeout Errors**: Connection timeouts, request timeouts
+- **Connection Errors**: Connection refused, network unreachable, connection reset
+- **HTTP Errors**: 404, 500, 503, and other HTTP status errors
+- **Rate Limiting**: 429 errors and rate limit responses
+
+### Advanced Error Handling Example
+
+```typescript
+import { testUrlWithRobustConfig } from '@hanivanrizky/nestjs-html-parser/ssl-and-dead-domains';
+
+// Test a potentially problematic URL with robust configuration
+const result = await testUrlWithRobustConfig('https://problematic-site.com', true);
+
+if (result.success) {
+  console.log(`Successfully scraped: ${result.title}`);
+} else {
+  console.log(`Failed with ${result.errorType}: ${result.error}`);
+  
+  // Handle specific error types
+  switch (result.errorType) {
+    case 'ssl':
+      console.log('Try with ignoreSSLErrors: true');
+      break;
+    case 'dns':
+      console.log('Domain appears to be dead');
+      break;
+    case 'timeout':
+      console.log('Site is very slow, try increasing timeout');
+      break;
+  }
+}
+```
 
 ## Verbose Mode & Error Handling
 
@@ -167,16 +265,29 @@ const html = await htmlParser.fetchHtml('https://example.com', {
     password: 'pass'
   },
   
+  // SSL handling
+  rejectUnauthorized: false,       // Accept self-signed certificates
+  ignoreSSLErrors: false,          // Don't completely ignore SSL
+  
   // Retry configuration
   retries: 3,                      // Number of retry attempts
   retryDelay: 1000,               // Delay between retries (ms)
+  maxRedirects: 5,                // Maximum redirects to follow
+  retryOnErrors: {                // Retry on specific error types
+    ssl: true,
+    timeout: true,
+    dns: true,
+    connectionRefused: true
+  },
   
   // Standard options
   timeout: 15000,                 // Request timeout
   headers: {                      // Custom headers
     'Accept': 'text/html,application/xhtml+xml',
     'Accept-Language': 'en-US,en;q=0.9'
-  }
+  },
+  
+  verbose: true                   // Enable detailed logging
 });
 ```
 
@@ -325,6 +436,12 @@ yarn demo:proxy
 # Run HtmlFetchResponse features demo
 yarn demo:response
 
+# Run SSL and dead domain handling demo
+yarn demo:ssl
+
+# Run TypeScript generic types demo
+yarn demo:typed
+
 # Run all demos sequentially
 yarn demo:all
 
@@ -334,6 +451,8 @@ yarn demo:watanoc:verbose
 yarn demo:otakudesu:verbose
 yarn demo:proxy:verbose
 yarn demo:response:verbose
+yarn demo:ssl:verbose
+yarn demo:typed:verbose
 ```
 
 ### Verbose Mode Benefits
@@ -342,64 +461,92 @@ yarn demo:response:verbose
 - **Command Line Control**: Use `--verbose` or `-v` flags with ts-node directly
 - **Production Ready**: Silent operation by default for clean logs
 
-These scripts provide an easy way to see the HTML parser in action with real-world websites, demonstrating various parsing techniques, proxy usage, and random user agent capabilities.
+These scripts provide an easy way to see the HTML parser in action with real-world websites, demonstrating various parsing techniques, proxy usage, random user agent capabilities, and comprehensive error handling.
 
 ## API Reference
 
 ### Core Methods
 
-#### `fetchHtml(url: string, options?: HtmlParserOptions): Promise<string>`
+#### `fetchHtml(url: string, options?: HtmlParserOptions): Promise<HtmlFetchResponse>`
 
-Fetch HTML content from a URL.
+Fetch HTML content from a URL with comprehensive error handling.
 
 ```typescript
-const html = await htmlParser.fetchHtml('https://example.com', {
+const response = await htmlParser.fetchHtml('https://example.com', {
   timeout: 10000,
-  headers: { 'User-Agent': 'Custom Agent' }
+  headers: { 'User-Agent': 'Custom Agent' },
+  retryOnErrors: {
+    ssl: true,
+    timeout: true,
+    dns: true,
+    connectionRefused: true
+  }
 });
 ```
 
-#### `extractSingle(html: string, selector: string, type?: 'xpath' | 'css', attribute?: string): string | null`
+#### `extractSingle<T = string>(html: string, selector: string, type?: 'xpath' | 'css', attribute?: string, options?: { verbose?: boolean; transform?: (value: string) => T }): T | null`
 
-Extract a single value using XPath or CSS selector.
+Extract a single value using XPath or CSS selector with type safety.
 
 ```typescript
 // Using XPath (default)
-const title = htmlParser.extractSingle(html, '//title/text()');
+const title = htmlParser.extractSingle<string>(html, '//title/text()');
 
 // Using CSS selector
-const title = htmlParser.extractSingle(html, 'title', 'css');
+const title = htmlParser.extractSingle<string>(html, 'title', 'css');
 
-// Extract attribute
-const href = htmlParser.extractSingle(html, '//a[@class="link"]', 'xpath', 'href');
+// Extract attribute with transformation
+const id = htmlParser.extractSingle<number>(html, '//div[@data-id]', 'xpath', 'data-id', {
+  transform: (value: string) => parseInt(value)
+});
+
+// Extract with boolean transformation
+const isActive = htmlParser.extractSingle<boolean>(html, '//div/@data-active', 'xpath', undefined, {
+  transform: (value: string) => value === 'true'
+});
 ```
 
-#### `extractMultiple(html: string, selector: string, type?: 'xpath' | 'css', attribute?: string): string[]`
+#### `extractMultiple<T = string>(html: string, selector: string, type?: 'xpath' | 'css', attribute?: string, options?: { verbose?: boolean; transform?: (value: string) => T }): T[]`
 
-Extract multiple matching values.
+Extract multiple matching values with type safety.
 
 ```typescript
 // Extract all links
-const links = htmlParser.extractMultiple(html, '//a/text()');
+const links = htmlParser.extractMultiple<string>(html, '//a/text()');
 
 // Extract all href attributes
-const urls = htmlParser.extractMultiple(html, '//a', 'xpath', 'href');
+const urls = htmlParser.extractMultiple<string>(html, '//a', 'xpath', 'href');
+
+// Extract with transformation
+const prices = htmlParser.extractMultiple<number>(html, '//span[@class="price"]/text()', 'xpath', undefined, {
+  transform: (value: string) => parseFloat(value.replace('$', ''))
+});
 ```
 
-#### `extractText(html: string, selector: string, type?: 'xpath' | 'css'): string | null`
+#### `extractText<T = string>(html: string, selector: string, type?: 'xpath' | 'css', options?: { verbose?: boolean; transform?: (value: string) => T }): T | null`
 
-Extract text content specifically.
+Extract text content specifically with type safety.
 
 ```typescript
-const text = htmlParser.extractText(html, '//p[@class="content"]');
+const text = htmlParser.extractText<string>(html, '//p[@class="content"]');
+
+// Extract with transformation
+const wordCount = htmlParser.extractText<number>(html, '//p[@class="content"]', 'xpath', {
+  transform: (text: string) => text.split(' ').length
+});
 ```
 
-#### `extractAttributes(html: string, selector: string, attribute: string, type?: 'xpath' | 'css'): string[]`
+#### `extractAttributes<T = string>(html: string, selector: string, attribute: string, type?: 'xpath' | 'css', options?: { verbose?: boolean; transform?: (value: string) => T }): T[]`
 
-Extract attribute values from multiple elements.
+Extract attribute values from multiple elements with type safety.
 
 ```typescript
-const imgSources = htmlParser.extractAttributes(html, '//img', 'src');
+const imgSources = htmlParser.extractAttributes<string>(html, '//img', 'src');
+
+// Extract with transformation
+const ids = htmlParser.extractAttributes<number>(html, '//div', 'data-id', 'xpath', {
+  transform: (value: string) => parseInt(value)
+});
 ```
 
 #### `exists(html: string, selector: string, type?: 'xpath' | 'css'): boolean`
@@ -446,14 +593,23 @@ console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
 
 ### Advanced Methods
 
-#### `extractStructured(html: string, schema: ExtractionSchema): Record<string, any>`
+#### `extractStructured<T = Record<string, any>>(html: string, schema: ExtractionSchema<T>, options?: { verbose?: boolean }): T`
 
-Extract data using a schema object.
+Extract data using a typed schema object.
 
 ```typescript
 import { ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
 
-const schema: ExtractionSchema = {
+// Define typed interface
+interface Article {
+  title: string;
+  author: string;
+  wordCount: number;
+  publishDate: Date;
+}
+
+// Create typed schema
+const schema: ExtractionSchema<Article> = {
   title: {
     selector: '//title/text()',
     type: 'xpath'
@@ -467,42 +623,159 @@ const schema: ExtractionSchema = {
     selector: '//article',
     type: 'css',
     transform: (text: string) => text.split(' ').length
+  },
+  publishDate: {
+    selector: '//time',
+    type: 'xpath',
+    attribute: 'datetime',
+    transform: (value: string) => new Date(value)
   }
 };
 
-const result = htmlParser.extractStructured(html, schema);
-// { title: "Page Title", author: "John Doe", wordCount: 150 }
+const result = htmlParser.extractStructured<Article>(html, schema);
+// Result: Article type with full type safety
+// { title: "Page Title", author: "John Doe", wordCount: 150, publishDate: Date }
 ```
 
-#### `extractStructuredList(html: string, containerSelector: string, schema: ExtractionSchema, containerType?: 'xpath' | 'css'): Record<string, any>[]`
+#### `extractStructuredList<T = Record<string, any>>(html: string, containerSelector: string, schema: ExtractionSchema<T>, containerType?: 'xpath' | 'css', options?: { verbose?: boolean }): T[]`
 
-Extract arrays of structured data.
+Extract arrays of typed structured data.
 
 ```typescript
-const articleSchema: ExtractionSchema = {
-  title: {
+// Define typed interface
+interface Product {
+  name: string;
+  price: number;
+  rating: number;
+  inStock: boolean;
+}
+
+// Create typed schema
+const productSchema: ExtractionSchema<Product> = {
+  name: {
     selector: './/h2/text()',
     type: 'xpath'
   },
-  url: {
-    selector: './/a',
+  price: {
+    selector: './/span[@class="price"]/text()',
     type: 'xpath',
-    attribute: 'href'
+    transform: (value: string) => parseFloat(value.replace('$', ''))
   },
-  date: {
-    selector: '.date',
-    type: 'css'
+  rating: {
+    selector: './/div[@data-rating]',
+    type: 'xpath',
+    attribute: 'data-rating',
+    transform: (value: string) => parseFloat(value)
+  },
+  inStock: {
+    selector: './/span[@class="stock"]',
+    type: 'xpath',
+    transform: (value: string) => value.toLowerCase() === 'in stock'
   }
 };
 
-const articles = htmlParser.extractStructuredList(
+const products = htmlParser.extractStructuredList<Product>(
   html,
-  '//article[@class="post"]',
-  articleSchema
+  '//div[@class="product"]',
+  productSchema
 );
+// Result: Product[] with full type safety
 ```
 
 ## Real-World Examples
+
+### SSL and Dead Domain Handling
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { HtmlParserService } from '@hanivanrizky/nestjs-html-parser';
+
+@Injectable()
+export class RobustScrapingService {
+  constructor(private readonly htmlParser: HtmlParserService) {}
+
+  async scrapeWithErrorHandling(url: string) {
+    try {
+      // Robust configuration for problematic sites
+      const response = await this.htmlParser.fetchHtml(url, {
+        // SSL handling
+        rejectUnauthorized: false,
+        ignoreSSLErrors: false,
+        
+        // Timeouts and retries
+        timeout: 15000,
+        retries: 5,
+        retryDelay: 2000,
+        maxRedirects: 10,
+        
+        // Error-specific retry logic
+        retryOnErrors: {
+          ssl: true,              // Retry SSL errors
+          timeout: true,          // Retry timeouts
+          dns: true,              // Retry DNS failures
+          connectionRefused: true // Retry connection refused
+        },
+        
+        // Stealth options
+        useRandomUserAgent: true,
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'Cache-Control': 'no-cache'
+        },
+        
+        verbose: true  // See detailed error categorization
+      });
+
+      const title = this.htmlParser.extractSingle(response.data, '//title/text()');
+      
+      return {
+        success: true,
+        title,
+        status: response.status,
+        contentLength: response.data.length
+      };
+
+    } catch (error) {
+      // Enhanced error handling with categorization
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Extract error type from enhanced error message
+      const errorTypeMatch = errorMessage.match(/Error type: (\w+)/);
+      const errorType = errorTypeMatch ? errorTypeMatch[1] : 'unknown';
+
+      console.log(`❌ Failed to scrape ${url}: ${errorType}`);
+      
+      // Handle specific error types
+      switch (errorType) {
+        case 'ssl':
+          console.log('💡 Try with ignoreSSLErrors: true for SSL issues');
+          break;
+        case 'dns':
+          console.log('💀 Domain appears to be dead or unreachable');
+          break;
+        case 'timeout':
+          console.log('⏰ Site is slow, consider increasing timeout');
+          break;
+        case 'connectionRefused':
+          console.log('🚫 Server is refusing connections');
+          break;
+        case 'http':
+          console.log('🌐 HTTP error - check if URL is correct');
+          break;
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        errorType,
+        url
+      };
+    }
+  }
+}
+```
 
 ### Hacker News Scraper
 
@@ -675,14 +948,16 @@ export class JapaneseLearningService {
 ## Complete Examples
 
 For complete working examples, see:
-- `src/examples/news.ycombinator.com.ts` - Comprehensive Hacker News parsing
+- `src/examples/news.ycombinator.com.ts` - Comprehensive Hacker News parsing with TypeScript generics
 - `src/examples/watanoc.com.ts` - Japanese learning website parsing
 - `src/examples/otakudesu.cloud.ts` - Indonesian anime site (Otakudesu) parsing
 - `src/examples/proxy-and-useragent.ts` - Proxy and random user agent usage
+- `src/examples/ssl-and-dead-domains.ts` - SSL error handling and dead domain management
+- `src/examples/typed-extraction.ts` - TypeScript generic types demonstration
 
 Run examples:
 ```bash
-# Run Hacker News example
+# Run Hacker News example (with TypeScript generics)
 yarn ts-node src/examples/news.ycombinator.com.ts
 
 # Run Watanoc example  
@@ -693,44 +968,88 @@ yarn ts-node src/examples/otakudesu.cloud.ts
 
 # Run Proxy & User Agent example
 yarn ts-node src/examples/proxy-and-useragent.ts
+
+# Run SSL & Dead Domain example
+yarn ts-node src/examples/ssl-and-dead-domains.ts
+
+# Run TypeScript Generic Types example
+yarn ts-node src/examples/typed-extraction.ts
 ```
 
 ## Schema Configuration
 
-The `ExtractionSchema` interface allows you to define complex extraction rules:
+The `ExtractionSchema` interface now supports generics for better type safety:
 
 ```typescript
-interface ExtractionSchema {
+interface ExtractionSchema<T = Record<string, any>> {
   [key: string]: {
-    selector: string;           // XPath or CSS selector
-    type: 'xpath' | 'css';     // Selector type
-    attribute?: string;         // Optional attribute to extract
-    transform?: (value: string) => any; // Optional transformation function
+    selector: string;                    // XPath or CSS selector
+    type: 'xpath' | 'css';              // Selector type
+    attribute?: string;                  // Attribute to extract
+    transform?: (value: string) => any;  // Transform function
   };
 }
+
+// Example with typed interface
+interface BlogPost {
+  title: string;
+  publishDate: Date;
+  viewCount: number;
+  isPublished: boolean;
+}
+
+const blogSchema: ExtractionSchema<BlogPost> = {
+  title: {
+    selector: '//h1/text()',
+    type: 'xpath'
+  },
+  publishDate: {
+    selector: '//time',
+    type: 'xpath',
+    attribute: 'datetime',
+    transform: (value: string) => new Date(value)
+  },
+  viewCount: {
+    selector: '//span[@data-views]',
+    type: 'xpath',
+    attribute: 'data-views',
+    transform: (value: string) => parseInt(value)
+  },
+  isPublished: {
+    selector: '//div[@data-status]',
+    type: 'xpath',
+    attribute: 'data-status',
+    transform: (value: string) => value === 'published'
+  }
+};
 ```
 
-### Transform Functions
+### Transform Functions with Type Safety
 
-Transform functions allow you to process extracted values:
+Transform functions now support type-safe transformations:
 
 ```typescript
-const schema: ExtractionSchema = {
+const schema: ExtractionSchema<BlogPost> = {
   price: {
     selector: '//span[@class="price"]/text()',
     type: 'xpath',
-    transform: (value: string) => parseFloat(value.replace('$', ''))
+    transform: (value: string) => parseFloat(value.replace('$', '')) // Returns number
   },
   tags: {
     selector: '//div[@class="tags"]/text()',
     type: 'xpath',
-    transform: (value: string) => value.split(',').map(tag => tag.trim())
+    transform: (value: string) => value.split(',').map(tag => tag.trim()) // Returns string[]
   },
   publishDate: {
     selector: '//time',
     type: 'css',
     attribute: 'datetime',
-    transform: (value: string) => new Date(value)
+    transform: (value: string) => new Date(value) // Returns Date
+  },
+  isActive: {
+    selector: '//div/@data-active',
+    type: 'xpath',
+    transform: (value: string) => value === 'true' // Returns boolean
   }
 };
 ```
@@ -837,6 +1156,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - User Agent
 - Random User Agent
 - Web Scraping
+- SSL Error Handling
+- Dead Domain Detection
 
 ## Types and Interfaces
 
@@ -869,7 +1190,7 @@ interface HtmlFetchResponse {
 
 ### HtmlParserOptions
 
-Configuration options for HTML fetching:
+Configuration options for HTML fetching with comprehensive error handling:
 
 ```typescript
 interface HtmlParserOptions {
@@ -880,6 +1201,16 @@ interface HtmlParserOptions {
   proxy?: ProxyConfig;             // Proxy configuration
   retries?: number;                // Number of retry attempts
   retryDelay?: number;             // Delay between retries in milliseconds
+  verbose?: boolean;               // Enable verbose logging
+  rejectUnauthorized?: boolean;    // Reject unauthorized SSL certificates (default: true)
+  ignoreSSLErrors?: boolean;       // Skip SSL certificate verification entirely
+  maxRedirects?: number;           // Maximum number of redirects to follow (default: 5)
+  retryOnErrors?: {                // Enable automatic retry on specific error types
+    ssl?: boolean;                 // Retry on SSL/TLS errors
+    timeout?: boolean;             // Retry on connection timeout
+    dns?: boolean;                 // Retry on DNS resolution errors
+    connectionRefused?: boolean;   // Retry on connection refused errors
+  };
 }
 ```
 
@@ -912,7 +1243,7 @@ const socksWithCreds: ProxyConfig = {
 Schema for structured data extraction:
 
 ```typescript
-interface ExtractionSchema {
+interface ExtractionSchema<T = Record<string, any>> {
   [key: string]: {
     selector: string;                    // XPath or CSS selector
     type: 'xpath' | 'css';              // Selector type
@@ -922,7 +1253,7 @@ interface ExtractionSchema {
 }
 
 // Example:
-const articleSchema: ExtractionSchema = {
+const articleSchema: ExtractionSchema<BlogPost> = {
   title: {
     selector: '//h1/text()',
     type: 'xpath'
@@ -936,6 +1267,18 @@ const articleSchema: ExtractionSchema = {
     type: 'css',
     attribute: 'datetime',
     transform: (value: string) => new Date(value)
+  },
+  viewCount: {
+    selector: '//span[@data-views]',
+    type: 'xpath',
+    attribute: 'data-views',
+    transform: (value: string) => parseInt(value)
+  },
+  isPublished: {
+    selector: '//div[@data-status]',
+    type: 'xpath',
+    attribute: 'data-status',
+    transform: (value: string) => value === 'published'
   }
 };
 ```
