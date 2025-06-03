@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ExtractionSchema, HtmlParserService } from './html-parser.service';
+import { HtmlParserService } from './html-parser.service';
+import { ExtractionSchema } from './types';
 
 describe('HtmlParserService', () => {
   let service: HtmlParserService;

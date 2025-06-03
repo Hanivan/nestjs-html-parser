@@ -1,0 +1,44 @@
+# Source files (we only want compiled dist files)
+src/
+*.ts
+!*.d.ts
+
+# Development files
+.git/
+.gitignore
+.prettierrc
+eslint.config.mjs
+nest-cli.json
+tsconfig.json
+tsconfig.build.json
+*.tsbuildinfo
+dist/*.tsbuildinfo
+PUBLISHING.md
+
+# Node modules and dependencies
+node_modules/
+yarn.lock
+package-lock.json
+
+# Testing and coverage
+test/
+coverage/
+*.spec.ts
+*.spec.js
+*.test.ts
+*.test.js
+
+# Examples (keep in source but not in npm package)
+src/examples/
+
+# Development tools
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.production 

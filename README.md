@@ -1,4 +1,4 @@
-# NestJS HTML Parser
+# @hanivanrizky/nestjs-html-parser
 
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
@@ -7,9 +7,9 @@
 <p align="center">A powerful NestJS package for parsing HTML content using XPath (primary) and CSS selectors (secondary) with comprehensive extraction capabilities.</p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/v/nestjs-html-parser.svg" alt="NPM Version" /></a>
-  <a href="https://www.npmjs.com/package/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/l/nestjs-html-parser.svg" alt="Package License" /></a>
-  <a href="https://www.npmjs.com/package/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/dm/nestjs-html-parser.svg" alt="NPM Downloads" /></a>
+  <a href="https://www.npmjs.com/package/@hanivanrizky/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/v/@hanivanrizky/nestjs-html-parser.svg" alt="NPM Version" /></a>
+  <a href="https://www.npmjs.com/package/@hanivanrizky/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/l/@hanivanrizky/nestjs-html-parser.svg" alt="Package License" /></a>
+  <a href="https://www.npmjs.com/package/@hanivanrizky/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/dm/@hanivanrizky/nestjs-html-parser.svg" alt="NPM Downloads" /></a>
 </p>
 
 ## Features
@@ -50,7 +50,7 @@ const html = await htmlParser.fetchHtml('https://example.com', {
 Full proxy support with multiple protocols and authentication:
 
 ```typescript
-import { ProxyConfig } from 'nestjs-html-parser';
+import { ProxyConfig } from '@hanivanrizky/nestjs-html-parser';
 
 // HTTP Proxy with separate credentials
 const httpProxy: ProxyConfig = {
@@ -153,9 +153,9 @@ const html = await htmlParser.fetchHtml('https://example.com', {
 ## Installation
 
 ```bash
-yarn add nestjs-html-parser
+yarn add @hanivanrizky/nestjs-html-parser
 # or
-npm install nestjs-html-parser
+npm install @hanivanrizky/nestjs-html-parser
 ```
 
 ## Quick Start
@@ -164,7 +164,7 @@ npm install nestjs-html-parser
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { HtmlParserModule } from 'nestjs-html-parser';
+import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
 
 @Module({
   imports: [HtmlParserModule],
@@ -176,7 +176,7 @@ export class AppModule {}
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { HtmlParserService } from 'nestjs-html-parser';
+import { HtmlParserService } from '@hanivanrizky/nestjs-html-parser';
 
 @Injectable()
 export class YourService {
@@ -405,7 +405,7 @@ console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
 Extract data using a schema object.
 
 ```typescript
-import { ExtractionSchema } from 'nestjs-html-parser';
+import { ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
 
 const schema: ExtractionSchema = {
   title: {
@@ -462,7 +462,7 @@ const articles = htmlParser.extractStructuredList(
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { HtmlParserService, ExtractionSchema } from 'nestjs-html-parser';
+import { HtmlParserService, ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
 
 @Injectable()
 export class HackerNewsService {
@@ -525,7 +525,7 @@ This example demonstrates parsing a Japanese learning website with multi-languag
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { HtmlParserService, ExtractionSchema } from 'nestjs-html-parser';
+import { HtmlParserService, ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
 
 @Injectable()
 export class JapaneseLearningService {
@@ -801,7 +801,7 @@ import {
   HtmlParserOptions,
   ProxyConfig,
   ExtractionSchema
-} from 'nestjs-html-parser';
+} from '@hanivanrizky/nestjs-html-parser';
 ```
 
 ### HtmlFetchResponse
