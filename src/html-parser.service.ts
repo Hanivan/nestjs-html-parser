@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { JSDOM } from 'jsdom';
 import { SocksProxyAgent } from 'socks-proxy-agent';
+import { HTML_PARSER_LOGGER_LEVEL } from './html-parser.config';
 import {
   ExtractionSchema,
   HtmlFetchResponse,
@@ -45,6 +46,9 @@ import {
  */
 @Injectable()
 export class HtmlParserService {
+  private readonly logger: Logger;
+  private readonly loggerLevel: string;
+
   /**
    * Default configuration options for HTML parsing operations
    */
@@ -67,40 +71,25 @@ export class HtmlParserService {
   };
 
   /**
-   * Store original console.error method for restoring
-   */
-  private originalConsoleError: any;
-
-  /**
-   * Store original console.warn method for restoring
-   */
-  private originalConsoleWarn: any;
-
-  /**
    * Initialize the HTML Parser Service
-   *
-   * Sets up default configuration and preserves original console methods
-   * for proper verbose logging functionality.
    */
-  constructor() {
-    this.originalConsoleError = console.error;
-    this.originalConsoleWarn = console.warn;
+  constructor(@Inject(HTML_PARSER_LOGGER_LEVEL) loggerLevel: string = 'log') {
+    this.logger = new Logger(HtmlParserService.name, { timestamp: true });
+    this.loggerLevel = loggerLevel;
   }
 
   /**
    * Suppress console output when verbose is false
    */
   private suppressConsole(): void {
-    console.error = () => {};
-    console.warn = () => {};
+    // No longer needed as we're using NestJS Logger
   }
 
   /**
    * Restore console output
    */
   private restoreConsole(): void {
-    console.error = this.originalConsoleError;
-    console.warn = this.originalConsoleWarn;
+    // No longer needed as we're using NestJS Logger
   }
 
   /**
@@ -171,8 +160,8 @@ export class HtmlParserService {
       config.retryDelay ?? this.defaultOptions.retryDelay ?? 1000;
 
     if (config.verbose) {
-      console.log(`🌐 Fetching URL: ${url}`);
-      console.log(`🔧 Configuration:`, {
+      this.logger.debug(`🌐 Fetching URL: ${url}`);
+      this.logger.debug(`🔧 Configuration:`, {
         timeout: config.timeout,
         retries: maxRetries,
         rejectUnauthorized: config.rejectUnauthorized,
@@ -184,7 +173,7 @@ export class HtmlParserService {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (config.verbose && attempt > 0) {
-          console.log(`🔄 Retry attempt ${attempt}/${maxRetries}`);
+          this.logger.debug(`🔄 Retry attempt ${attempt}/${maxRetries}`);
         }
 
         // Get user agent - either random or specified
@@ -218,7 +207,7 @@ export class HtmlParserService {
         const response = await axios.get(url, axiosConfig);
 
         if (config.verbose) {
-          console.log(
+          this.logger.debug(
             `✅ Successfully fetched ${url} (${response.status} ${response.statusText})`,
           );
         }
@@ -234,7 +223,7 @@ export class HtmlParserService {
         const errorInfo = this.categorizeError(lastError);
 
         if (config.verbose) {
-          console.log(
+          this.logger.error(
             `❌ Attempt ${attempt + 1} failed: ${errorInfo.type} - ${lastError.message}`,
           );
         }
@@ -243,7 +232,7 @@ export class HtmlParserService {
         const shouldRetry = this.shouldRetryOnError(errorInfo, config);
 
         if (config.verbose) {
-          console.log(
+          this.logger.debug(
             `🤔 Should retry: ${shouldRetry}, Attempts left: ${maxRetries - attempt}`,
           );
         }
@@ -251,7 +240,7 @@ export class HtmlParserService {
         // If this is not the last attempt and we should retry this error type
         if (attempt < maxRetries && shouldRetry) {
           if (config.verbose) {
-            console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+            this.logger.debug(`⏳ Waiting ${retryDelay}ms before retry...`);
           }
           await this.delay(retryDelay);
           continue;
@@ -260,7 +249,7 @@ export class HtmlParserService {
         // If we shouldn't retry this error type, break early
         if (!shouldRetry) {
           if (config.verbose) {
-            console.log(`🚫 Not retrying ${errorInfo.type} error`);
+            this.logger.debug(`🚫 Not retrying ${errorInfo.type} error`);
           }
           break;
         }
@@ -499,7 +488,7 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose) {
-      console.log(
+      this.logger.debug(
         `🔍 extractSingle - Selector: "${selector}", Type: ${type}, Attribute: ${attribute || 'none'}`,
       );
     }
@@ -514,7 +503,7 @@ export class HtmlParserService {
       }
 
       if (verbose) {
-        console.log(
+        this.logger.debug(
           `✅ extractSingle result: ${result ? `"${result.substring(0, 100)}${result.length > 100 ? '...' : ''}"` : 'null'}`,
         );
       }
@@ -528,7 +517,7 @@ export class HtmlParserService {
       return result as T | null;
     } catch (error) {
       if (verbose) {
-        console.error('❌ Error in extractSingle:', error);
+        this.logger.error('❌ Error in extractSingle:', error);
       }
       return null;
     }
@@ -595,7 +584,7 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose) {
-      console.log(
+      this.logger.debug(
         `🔍 extractMultiple - Selector: "${selector}", Type: ${type}, Attribute: ${attribute || 'none'}`,
       );
     }
@@ -610,21 +599,21 @@ export class HtmlParserService {
       }
 
       if (verbose) {
-        console.log(`✅ extractMultiple found ${results.length} results`);
+        this.logger.debug(`✅ extractMultiple found ${results.length} results`);
         if (results.length > 0 && results.length <= 5) {
           results.forEach((result, index) => {
-            console.log(
+            this.logger.debug(
               `   ${index + 1}: "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
             );
           });
         } else if (results.length > 5) {
-          console.log(`   First 3 results:`);
+          this.logger.debug(`   First 3 results:`);
           results.slice(0, 3).forEach((result, index) => {
-            console.log(
+            this.logger.debug(
               `   ${index + 1}: "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
             );
           });
-          console.log(`   ... and ${results.length - 3} more`);
+          this.logger.debug(`   ... and ${results.length - 3} more`);
         }
       }
 
@@ -637,7 +626,7 @@ export class HtmlParserService {
       return results as T[];
     } catch (error) {
       if (verbose) {
-        console.error('❌ Error in extractMultiple:', error);
+        this.logger.error('❌ Error in extractMultiple:', error);
       }
       return [];
     }
@@ -709,7 +698,7 @@ export class HtmlParserService {
       return result as T | null;
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractText:', error);
+        this.logger.error('Error in extractText:', error);
       }
       return null;
     }
@@ -790,7 +779,7 @@ export class HtmlParserService {
       return results as T[];
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractAttributes:', error);
+        this.logger.error('Error in extractAttributes:', error);
       }
       return [];
     }
@@ -846,7 +835,7 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose) {
-      console.log(
+      this.logger.debug(
         `🔍 exists - Checking selector: "${selector}", Type: ${type}`,
       );
     }
@@ -863,13 +852,15 @@ export class HtmlParserService {
       }
 
       if (verbose) {
-        console.log(`✅ exists result: ${result ? 'Found' : 'Not found'}`);
+        this.logger.debug(
+          `✅ exists result: ${result ? 'Found' : 'Not found'}`,
+        );
       }
 
       return result;
     } catch (error) {
       if (verbose) {
-        console.error('❌ Error in exists:', error);
+        this.logger.error('❌ Error in exists:', error);
       }
       return false;
     }
@@ -929,7 +920,9 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose) {
-      console.log(`🔍 count - Counting selector: "${selector}", Type: ${type}`);
+      this.logger.debug(
+        `🔍 count - Counting selector: "${selector}", Type: ${type}`,
+      );
     }
 
     try {
@@ -944,13 +937,13 @@ export class HtmlParserService {
       }
 
       if (verbose) {
-        console.log(`✅ count result: ${result} elements found`);
+        this.logger.debug(`✅ count result: ${result} elements found`);
       }
 
       return result;
     } catch (error) {
       if (verbose) {
-        console.error('❌ Error in count:', error);
+        this.logger.error('❌ Error in count:', error);
       }
       return 0;
     }
@@ -1059,14 +1052,14 @@ export class HtmlParserService {
           result[key] = value;
         } catch (error) {
           if (verbose) {
-            console.error(`Error extracting field '${key}':`, error);
+            this.logger.error(`Error extracting field '${key}':`, error);
           }
           result[key] = null;
         }
       }
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractStructured:', error);
+        this.logger.error('Error in extractStructured:', error);
       }
     }
 
@@ -1163,10 +1156,10 @@ export class HtmlParserService {
     const results: T[] = [];
 
     if (verbose) {
-      console.log(
+      this.logger.debug(
         `🔍 extractStructuredList - Container: "${containerSelector}", Type: ${containerType}`,
       );
-      console.log(`📋 Schema fields: ${Object.keys(schema).join(', ')}`);
+      this.logger.debug(`📋 Schema fields: ${Object.keys(schema).join(', ')}`);
     }
 
     try {
@@ -1180,14 +1173,16 @@ export class HtmlParserService {
       }
 
       if (verbose) {
-        console.log(`📦 Found ${containers.length} containers to process`);
+        this.logger.debug(
+          `📦 Found ${containers.length} containers to process`,
+        );
       }
 
       for (let i = 0; i < containers.length; i++) {
         const container = containers[i];
 
         if (verbose) {
-          console.log(
+          this.logger.debug(
             `\n📦 Processing container ${i + 1}/${containers.length}`,
           );
         }
@@ -1205,20 +1200,20 @@ export class HtmlParserService {
                 value !== null && value !== undefined && value !== '',
             )
             .map(([key, _]) => key);
-          console.log(
+          this.logger.debug(
             `✅ Container ${i + 1} extracted fields: ${extractedFields.join(', ')}`,
           );
         }
       }
 
       if (verbose) {
-        console.log(
+        this.logger.debug(
           `\n🎯 extractStructuredList completed: ${results.length} items extracted`,
         );
       }
     } catch (error) {
       if (verbose) {
-        console.error('❌ Error in extractStructuredList:', error);
+        this.logger.error('❌ Error in extractStructuredList:', error);
       }
     }
 
@@ -1255,7 +1250,7 @@ export class HtmlParserService {
 
           // Only log non-CSS errors in verbose mode
           if (!isCSSError) {
-            console.error('XPath evaluation error:', error);
+            this.logger.error('XPath evaluation error:', error);
           }
         });
 
@@ -1267,17 +1262,17 @@ export class HtmlParserService {
             warningString.includes('stylesheet');
 
           if (!isCSSWarning) {
-            console.warn('XPath evaluation warning:', warning);
+            this.logger.warn('XPath evaluation warning:', warning);
           }
         });
 
         // Allow info and log messages in verbose mode
         virtualConsole.on('info', (...args) => {
-          if (verbose) console.info('XPath info:', ...args);
+          if (verbose) this.logger.debug('XPath info:', ...args);
         });
 
         virtualConsole.on('log', (...args) => {
-          if (verbose) console.log('XPath log:', ...args);
+          if (verbose) this.logger.debug('XPath log:', ...args);
         });
       }
 
@@ -1305,15 +1300,17 @@ export class HtmlParserService {
       }
 
       if (verbose && nodes.length === 0) {
-        console.log(`XPath query "${xpath}" returned no results`);
+        this.logger.debug(`XPath query "${xpath}" returned no results`);
       } else if (verbose) {
-        console.log(`XPath query "${xpath}" returned ${nodes.length} results`);
+        this.logger.debug(
+          `XPath query "${xpath}" returned ${nodes.length} results`,
+        );
       }
 
       return nodes;
     } catch (error) {
       if (verbose) {
-        console.error('XPath evaluation error:', error);
+        this.logger.error('XPath evaluation error:', error);
       }
       return [];
     }
@@ -1389,7 +1386,7 @@ export class HtmlParserService {
       return null;
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractSingleXPath:', error);
+        this.logger.error('Error in extractSingleXPath:', error);
       }
       return null;
     }
@@ -1457,7 +1454,7 @@ export class HtmlParserService {
       return results;
     } catch (error) {
       if (verbose) {
-        console.error('Error in extractMultipleXPath:', error);
+        this.logger.error('Error in extractMultipleXPath:', error);
       }
       return [];
     }

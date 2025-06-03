@@ -25,7 +25,7 @@
 - **🔄 Random User Agents**: Built-in random user agent generation for stealth scraping
 - **🔗 Proxy Support**: HTTP, HTTPS, and SOCKS proxy support with authentication
 - **🔁 Retry Logic**: Configurable retry mechanism with exponential backoff
-- **🔇 Verbose Control**: Optional verbose mode for debugging (CSS errors suppressed by default)
+- **🔇 Verbose & Logger Level Control**: Optional verbose mode for debugging and configurable logger level (debug, log, warn, error, verbose)
 - **🔒 SSL Error Handling**: Comprehensive SSL certificate error handling and bypass options
 - **💀 Dead Domain Support**: Advanced error categorization for dead/unreachable domains
 - **🔄 Smart Retry Logic**: Error-type-specific retry strategies for different network issues
@@ -308,7 +308,61 @@ import { Module } from '@nestjs/common';
 import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
 
 @Module({
-  imports: [HtmlParserModule],
+  imports: [
+    HtmlParserModule.forRoot({ loggerLevel: 'debug' }), // Set logger level: 'debug', 'log', 'warn', 'error', or 'verbose'
+  ],
+})
+export class AppModule {}
+```
+
+- The `loggerLevel` option controls the minimum log level for the internal logger used by `HtmlParserService`.
+- Available levels: `'debug'`, `'log'`, `'warn'`, `'error'`, `'verbose'` (default: `'log'`).
+- This affects all logs produced by the parser service, including fetch, extraction, and error logs.
+
+#### Async Configuration Example
+
+You can also use `forRootAsync` for dynamic or environment-based configuration:
+
+```typescript
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot(),
+    HtmlParserModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        loggerLevel: configService.get<'debug'|'log'|'warn'|'error'|'verbose'>('HTML_PARSER_LOGGER_LEVEL', 'warn'),
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Or with a class:
+
+```typescript
+import { Injectable, Module } from '@nestjs/common';
+import { HtmlParserModule, HtmlParserConfig, HtmlParserConfigFactory } from '@hanivanrizky/nestjs-html-parser';
+
+@Injectable()
+class ParserConfigService implements HtmlParserConfigFactory {
+  createHtmlParserConfig(): HtmlParserConfig {
+    return { loggerLevel: process.env.HTML_PARSER_LOGGER_LEVEL as any || 'error' };
+  }
+}
+
+@Module({
+  imports: [
+    HtmlParserModule.forRootAsync({
+      useClass: ParserConfigService,
+    }),
+  ],
+  providers: [ParserConfigService],
 })
 export class AppModule {}
 ```

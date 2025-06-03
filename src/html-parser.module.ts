@@ -1,4 +1,14 @@
-import { Module } from '@nestjs/common';
+import {
+  DynamicModule,
+  Module,
+  ModuleMetadata,
+  Provider,
+  Type,
+} from '@nestjs/common';
+import {
+  HTML_PARSER_LOGGER_LEVEL,
+  HtmlParserConfig,
+} from './html-parser.config';
 import { HtmlParserService } from './html-parser.service';
 
 /**
@@ -43,8 +53,76 @@ import { HtmlParserService } from './html-parser.service';
  * }
  * ```
  */
-@Module({
-  providers: [HtmlParserService],
-  exports: [HtmlParserService],
-})
-export class HtmlParserModule {}
+
+export interface HtmlParserModuleAsyncOptions
+  extends Pick<ModuleMetadata, 'imports'> {
+  useExisting?: Type<HtmlParserConfigFactory>;
+  useClass?: Type<HtmlParserConfigFactory>;
+  useFactory?: (...args: any[]) => Promise<HtmlParserConfig> | HtmlParserConfig;
+  inject?: any[];
+}
+
+export interface HtmlParserConfigFactory {
+  createHtmlParserConfig(): Promise<HtmlParserConfig> | HtmlParserConfig;
+}
+
+@Module({})
+export class HtmlParserModule {
+  static forRoot(config: HtmlParserConfig = {}): DynamicModule {
+    const configProvider: Provider = {
+      provide: HTML_PARSER_LOGGER_LEVEL,
+      useValue: config.loggerLevel || 'log',
+    };
+
+    return {
+      module: HtmlParserModule,
+      providers: [HtmlParserService, configProvider],
+      exports: [HtmlParserService],
+    };
+  }
+
+  static forRootAsync(options: HtmlParserModuleAsyncOptions): DynamicModule {
+    const asyncProviders = this.createAsyncProviders(options);
+    return {
+      module: HtmlParserModule,
+      imports: options.imports || [],
+      providers: [HtmlParserService, ...asyncProviders],
+      exports: [HtmlParserService],
+    };
+  }
+
+  private static createAsyncProviders(
+    options: HtmlParserModuleAsyncOptions,
+  ): Provider[] {
+    if (options.useFactory) {
+      return [
+        {
+          provide: HTML_PARSER_LOGGER_LEVEL,
+          useFactory: async (...args: any[]) => {
+            const config = await options.useFactory!(...args);
+            return config.loggerLevel || 'log';
+          },
+          inject: options.inject || [],
+        },
+      ];
+    }
+    // useClass or useExisting
+    const inject = [
+      (options.useExisting ||
+        options.useClass) as Type<HtmlParserConfigFactory>,
+    ];
+    return [
+      {
+        provide: HTML_PARSER_LOGGER_LEVEL,
+        useFactory: async (factory: HtmlParserConfigFactory) => {
+          const config = await factory.createHtmlParserConfig();
+          return config.loggerLevel || 'log';
+        },
+        inject,
+      },
+      ...(options.useClass
+        ? [{ provide: options.useClass, useClass: options.useClass }]
+        : []),
+    ];
+  }
+}
