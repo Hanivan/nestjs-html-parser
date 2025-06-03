@@ -1,7 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { JSDOM } from 'jsdom';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+
+export interface ProxyConfig {
+  url: string;
+  type?: 'http' | 'https' | 'socks4' | 'socks5';
+  username?: string;
+  password?: string;
+}
+
+export interface HtmlFetchResponse {
+  data: string;
+  headers: Record<string, string>;
+  status: number;
+  statusText: string;
+}
 
 export interface ExtractionSchema {
   [key: string]: {
@@ -16,6 +32,10 @@ export interface HtmlParserOptions {
   timeout?: number;
   headers?: Record<string, string>;
   userAgent?: string;
+  useRandomUserAgent?: boolean;
+  proxy?: ProxyConfig;
+  retries?: number;
+  retryDelay?: number;
 }
 
 @Injectable()
@@ -23,27 +43,179 @@ export class HtmlParserService {
   private defaultOptions: HtmlParserOptions = {
     timeout: 10000,
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    useRandomUserAgent: false,
+    retries: 3,
+    retryDelay: 1000,
   };
 
   constructor() {}
 
   /**
-   * Fetch HTML content from a URL
+   * Fetch HTML content from a URL with support for random user agents and proxies
    */
-  async fetchHtml(url: string, options?: HtmlParserOptions): Promise<string> {
+  async fetchHtml(
+    url: string,
+    options?: HtmlParserOptions,
+  ): Promise<HtmlFetchResponse> {
     const config = { ...this.defaultOptions, ...options };
+    let lastError: Error | undefined;
+    const maxRetries = config.retries ?? this.defaultOptions.retries ?? 3;
+    const retryDelay =
+      config.retryDelay ?? this.defaultOptions.retryDelay ?? 1000;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Get user agent - either random or specified
+        const userAgent = config.useRandomUserAgent
+          ? await this.getRandomUserAgent()
+          : config.userAgent;
+
+        // Create axios config
+        const axiosConfig: any = {
+          timeout: config.timeout,
+          headers: {
+            'User-Agent': userAgent,
+            ...config.headers,
+          },
+        };
+
+        // Add proxy configuration if provided
+        if (config.proxy) {
+          axiosConfig.httpAgent = this.createProxyAgent(config.proxy, false);
+          axiosConfig.httpsAgent = this.createProxyAgent(config.proxy, true);
+        }
+
+        const response = await axios.get(url, axiosConfig);
+        return {
+          data: response.data,
+          headers: this.normalizeHeaders(response.headers),
+          status: response.status,
+          statusText: response.statusText,
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // If this is not the last attempt, wait before retrying
+        if (attempt < maxRetries) {
+          await this.delay(retryDelay);
+          continue;
+        }
+      }
+    }
+
+    throw new Error(
+      `Failed to fetch HTML from ${url} after ${maxRetries + 1} attempts: ${lastError?.message || 'Unknown error'}`,
+    );
+  }
+
+  /**
+   * Create a proxy agent based on proxy configuration
+   */
+  private createProxyAgent(proxy: ProxyConfig, isHttps: boolean): any {
+    if (!proxy.url || proxy.url.trim() === '') {
+      throw new Error('Proxy URL cannot be empty');
+    }
+
+    let proxyUrl = proxy.url;
 
     try {
-      const response = await axios.get(url, {
-        timeout: config.timeout,
-        headers: {
-          'User-Agent': config.userAgent,
-          ...config.headers,
-        },
-      });
-      return response.data;
+      const url = new URL(proxy.url);
+
+      // If separate username/password are provided, they take precedence
+      if (proxy.username && proxy.password) {
+        url.username = proxy.username;
+        url.password = proxy.password;
+      }
+      // If URL already contains credentials and no separate creds provided, keep them
+      // (URL constructor automatically parses user:pass@host format)
+
+      proxyUrl = url.toString();
     } catch (error) {
-      throw new Error(`Failed to fetch HTML from ${url}: ${error.message}`);
+      // If URL parsing fails, try to construct a basic URL
+      // This handles cases where the URL might be in a non-standard format
+      if (proxy.username && proxy.password) {
+        // Try to add credentials to potentially malformed URL
+        const hasProtocol = proxy.url.includes('://');
+        if (hasProtocol) {
+          const [protocol, rest] = proxy.url.split('://');
+          proxyUrl = `${protocol}://${proxy.username}:${proxy.password}@${rest}`;
+        } else {
+          // Assume http if no protocol specified
+          proxyUrl = `http://${proxy.username}:${proxy.password}@${proxy.url}`;
+        }
+      }
+    }
+
+    // Determine proxy type from URL if not specified
+    const proxyType = proxy.type || this.detectProxyType(proxy.url);
+
+    switch (proxyType) {
+      case 'socks4':
+      case 'socks5':
+        return new SocksProxyAgent(proxyUrl);
+      case 'http':
+      case 'https':
+      default:
+        return new HttpsProxyAgent(proxyUrl);
+    }
+  }
+
+  /**
+   * Detect proxy type from URL
+   */
+  private detectProxyType(url: string): string {
+    const protocol = url.split('://')[0].toLowerCase();
+    switch (protocol) {
+      case 'socks4':
+      case 'socks5':
+        return protocol;
+      case 'http':
+      case 'https':
+        return protocol;
+      default:
+        return 'http';
+    }
+  }
+
+  /**
+   * Delay function for retries
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Generate a random user agent
+   */
+  async getRandomUserAgent(): Promise<string> {
+    try {
+      const { randUA } = await import('@ahmedrangel/rand-user-agent');
+      return randUA();
+    } catch (error) {
+      // Fallback to default user agent if dynamic import fails
+      return (
+        this.defaultOptions.userAgent ||
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      );
+    }
+  }
+
+  /**
+   * Test proxy connection
+   */
+  async testProxy(
+    proxy: ProxyConfig,
+    testUrl: string = 'https://httpbin.org/ip',
+  ): Promise<boolean> {
+    try {
+      await this.fetchHtml(testUrl, {
+        proxy,
+        timeout: 5000,
+        retries: 0,
+      });
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -441,5 +613,15 @@ export class HtmlParserService {
     } catch (error) {
       return [];
     }
+  }
+
+  private normalizeHeaders(headers: any): Record<string, string> {
+    const normalizedHeaders: Record<string, string> = {};
+    for (const key in headers) {
+      if (headers[key] !== undefined && headers[key] !== null) {
+        normalizedHeaders[key] = String(headers[key]);
+      }
+    }
+    return normalizedHeaders;
   }
 }

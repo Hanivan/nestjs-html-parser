@@ -1,12 +1,13 @@
-import { ExtractionSchema, HtmlParserService } from './html-parser.service';
+import { ExtractionSchema, HtmlParserService } from '../html-parser.service';
 
-async function demonstrateHtmlParser() {
+async function demonstrateHackerNewsParser() {
   const parser = new HtmlParserService();
 
   try {
     // Fetch HTML from Hacker News
     console.log('Fetching HTML from Hacker News...');
-    const html = await parser.fetchHtml('https://news.ycombinator.com/');
+    const response = await parser.fetchHtml('https://news.ycombinator.com/');
+    const html = response.data;
 
     console.log('\n=== Basic Extraction Examples ===');
 
@@ -157,16 +158,24 @@ async function demonstrateHtmlParser() {
 
     const mixedResult = parser.extractStructured(html, mixedSchema);
     console.log('Mixed selectors result:', mixedResult);
+
+    console.log('\n=== Additional Examples ===');
+    console.log(
+      'For more examples including Japanese language learning site parsing,',
+    );
+    console.log(
+      'see examples/watanoc.com.ts which demonstrates parsing https://watanoc.com/',
+    );
   } catch (error) {
-    console.error('Error demonstrating HTML parser:', error.message);
+    console.error('Error demonstrating Hacker News parser:', error.message);
   }
 }
 
 // Run the demonstration if this file is executed directly
 if (require.main === module) {
-  demonstrateHtmlParser()
-    .then(() => console.log('\nDemo completed!'))
+  demonstrateHackerNewsParser()
+    .then(() => console.log('\nHacker News parsing demo completed!'))
     .catch(console.error);
 }
 
-export { demonstrateHtmlParser };
+export { demonstrateHackerNewsParser };

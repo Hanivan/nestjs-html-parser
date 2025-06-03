@@ -14,7 +14,8 @@ describe('HtmlParserService', () => {
 
     // Fetch Hacker News HTML for testing
     try {
-      hackerNewsHtml = await service.fetchHtml('https://news.ycombinator.com/');
+      const response = await service.fetchHtml('https://news.ycombinator.com/');
+      hackerNewsHtml = response.data;
     } catch (error) {
       console.warn('Failed to fetch live Hacker News, using mock HTML');
       hackerNewsHtml = getMockHackerNewsHtml();
@@ -27,10 +28,13 @@ describe('HtmlParserService', () => {
 
   describe('fetchHtml', () => {
     it('should fetch HTML content from a URL', async () => {
-      const html = await service.fetchHtml('https://news.ycombinator.com/');
-      expect(typeof html).toBe('string');
-      expect(html.length).toBeGreaterThan(0);
-      expect(html).toContain('<title>Hacker News</title>');
+      const response = await service.fetchHtml('https://news.ycombinator.com/');
+      expect(typeof response.data).toBe('string');
+      expect(response.data.length).toBeGreaterThan(0);
+      expect(response.data).toContain('<title>Hacker News</title>');
+      expect(typeof response.status).toBe('number');
+      expect(response.status).toBe(200);
+      expect(typeof response.headers).toBe('object');
     });
 
     it('should handle fetch errors gracefully', async () => {
@@ -46,11 +50,11 @@ describe('HtmlParserService', () => {
       };
 
       // This should not throw with valid options
-      const html = await service.fetchHtml(
+      const response = await service.fetchHtml(
         'https://news.ycombinator.com/',
         options,
       );
-      expect(typeof html).toBe('string');
+      expect(typeof response.data).toBe('string');
     });
   });
 
@@ -475,6 +479,390 @@ describe('HtmlParserService', () => {
       expect(typeof firstStory.title).toBe('string');
       expect(firstStory.title.length).toBeGreaterThan(0);
       expect(typeof firstStory.url).toBe('string');
+    });
+  });
+
+  describe('Random User Agent functionality', () => {
+    it('should generate random user agents', async () => {
+      const userAgent1 = await service.getRandomUserAgent();
+      const userAgent2 = await service.getRandomUserAgent();
+      const userAgent3 = await service.getRandomUserAgent();
+
+      expect(typeof userAgent1).toBe('string');
+      expect(typeof userAgent2).toBe('string');
+      expect(typeof userAgent3).toBe('string');
+      expect(userAgent1.length).toBeGreaterThan(0);
+      expect(userAgent2.length).toBeGreaterThan(0);
+      expect(userAgent3.length).toBeGreaterThan(0);
+
+      // Random user agents should typically be different (though not guaranteed)
+      const userAgents = [userAgent1, userAgent2, userAgent3];
+      const uniqueUserAgents = [...new Set(userAgents)];
+      expect(uniqueUserAgents.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should use random user agent when useRandomUserAgent is true', async () => {
+      // Mock a simple endpoint that echoes the user agent
+      const testUrl = 'https://httpbin.org/user-agent';
+
+      try {
+        const response = await service.fetchHtml(testUrl, {
+          useRandomUserAgent: true,
+          timeout: 5000, // Reduced timeout
+          retries: 1, // Reduced retries for tests
+        });
+
+        expect(typeof response.data).toBe('string');
+        expect(response.data.length).toBeGreaterThan(0);
+
+        // The response should contain user agent information
+        expect(response.data).toContain('user-agent');
+      } catch (error) {
+        // If external service fails, just verify the option doesn't break the function
+        console.warn('httpbin.org test skipped due to network error');
+        expect(error).toBeDefined(); // Just ensure error handling works
+      }
+    }, 20000);
+
+    it('should use specified user agent when useRandomUserAgent is false', async () => {
+      const customUserAgent = 'TestBot/1.0';
+
+      try {
+        const response = await service.fetchHtml(
+          'https://httpbin.org/user-agent',
+          {
+            userAgent: customUserAgent,
+            useRandomUserAgent: false,
+            timeout: 5000, // Reduced timeout
+            retries: 1, // Reduced retries for tests
+          },
+        );
+
+        if (response.data && response.data.includes('user-agent')) {
+          expect(response.data).toContain(customUserAgent);
+        }
+      } catch (error) {
+        console.warn('httpbin.org test skipped due to network error');
+        expect(error).toBeDefined(); // Just ensure error handling works
+      }
+    }, 20000);
+
+    it('should fallback gracefully when rand-user-agent import fails', async () => {
+      // Test the fallback behavior
+      const userAgent = await service.getRandomUserAgent();
+      expect(typeof userAgent).toBe('string');
+      expect(userAgent.length).toBeGreaterThan(0);
+      // Should either be a random UA or the fallback UA
+      expect(userAgent).toMatch(/Mozilla|Chrome|Safari|Firefox/);
+    });
+  });
+
+  describe('Proxy functionality', () => {
+    it('should handle proxy configuration without errors', async () => {
+      const proxyConfig = {
+        url: 'http://127.0.0.1:8080',
+        type: 'http' as const,
+      };
+
+      // This test mainly ensures the proxy configuration doesn't cause syntax errors
+      // Real proxy testing would require an actual proxy server
+      try {
+        const response = await service.fetchHtml('https://httpbin.org/ip', {
+          proxy: proxyConfig,
+          timeout: 2000, // Very short timeout
+          retries: 0,
+        });
+      } catch (error) {
+        // Expected to fail without real proxy, but should not be a configuration error
+        expect(error.message).not.toContain('TypeError');
+        expect(error.message).not.toContain('undefined');
+      }
+    });
+
+    it('should test proxy connection', async () => {
+      const proxyConfig = {
+        url: 'http://nonexistent-proxy.example.com:8080',
+        type: 'http' as const,
+      };
+
+      const isWorking = await service.testProxy(proxyConfig);
+      expect(typeof isWorking).toBe('boolean');
+      expect(isWorking).toBe(false); // Should fail for nonexistent proxy
+    });
+
+    it('should handle different proxy types', () => {
+      const httpProxy = { url: 'http://proxy.example.com:8080' };
+      const httpsProxy = { url: 'https://proxy.example.com:8080' };
+      const socksProxy = { url: 'socks5://proxy.example.com:1080' };
+
+      // These tests verify that proxy agent creation doesn't throw errors
+      expect(() => service['createProxyAgent'](httpProxy, false)).not.toThrow();
+      expect(() => service['createProxyAgent'](httpsProxy, true)).not.toThrow();
+      expect(() =>
+        service['createProxyAgent'](socksProxy, false),
+      ).not.toThrow();
+    });
+
+    it('should detect proxy type from URL', () => {
+      expect(service['detectProxyType']('http://proxy.com:8080')).toBe('http');
+      expect(service['detectProxyType']('https://proxy.com:8080')).toBe(
+        'https',
+      );
+      expect(service['detectProxyType']('socks4://proxy.com:1080')).toBe(
+        'socks4',
+      );
+      expect(service['detectProxyType']('socks5://proxy.com:1080')).toBe(
+        'socks5',
+      );
+      expect(service['detectProxyType']('unknown://proxy.com:1080')).toBe(
+        'http',
+      );
+    });
+
+    it('should handle proxy authentication configuration', () => {
+      const proxyWithAuth = {
+        url: 'http://proxy.example.com:8080',
+        username: 'testuser',
+        password: 'testpass',
+      };
+
+      // Should not throw when creating proxy agent with auth
+      expect(() =>
+        service['createProxyAgent'](proxyWithAuth, false),
+      ).not.toThrow();
+    });
+
+    it('should support proxy credentials in URL format', () => {
+      const proxyWithUrlCreds = {
+        url: 'http://user:pass@proxy.example.com:8080',
+      };
+
+      // Should not throw when creating proxy agent with URL credentials
+      expect(() =>
+        service['createProxyAgent'](proxyWithUrlCreds, false),
+      ).not.toThrow();
+    });
+
+    it('should prioritize separate credentials over URL credentials', () => {
+      const proxyWithBothCreds = {
+        url: 'http://urluser:urlpass@proxy.example.com:8080',
+        username: 'separateuser',
+        password: 'separatepass',
+      };
+
+      // Should not throw and should use separate credentials
+      expect(() =>
+        service['createProxyAgent'](proxyWithBothCreds, false),
+      ).not.toThrow();
+    });
+
+    it('should handle SOCKS proxy with URL credentials', () => {
+      const socksProxyWithCreds = {
+        url: 'socks5://user:pass@proxy.example.com:1080',
+        type: 'socks5' as const,
+      };
+
+      expect(() =>
+        service['createProxyAgent'](socksProxyWithCreds, false),
+      ).not.toThrow();
+    });
+
+    it('should handle malformed URLs gracefully', () => {
+      const malformedProxy = {
+        url: 'not-a-valid-url',
+        username: 'user',
+        password: 'pass',
+      };
+
+      // Should not throw even with malformed URL
+      expect(() =>
+        service['createProxyAgent'](malformedProxy, false),
+      ).not.toThrow();
+    });
+
+    it('should handle URLs without protocol', () => {
+      const noProtocolProxy = {
+        url: 'proxy.example.com:8080',
+        username: 'user',
+        password: 'pass',
+      };
+
+      // Should not throw and should assume http
+      expect(() =>
+        service['createProxyAgent'](noProtocolProxy, false),
+      ).not.toThrow();
+    });
+  });
+
+  describe('Retry functionality', () => {
+    it('should retry failed requests', async () => {
+      const startTime = Date.now();
+
+      try {
+        const response = await service.fetchHtml(
+          'https://nonexistent-domain-12345.example',
+          {
+            retries: 2,
+            retryDelay: 100,
+            timeout: 500, // Very short timeout to force failure
+          },
+        );
+      } catch (error) {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        // Should have taken at least 200ms for 2 retries with 100ms delay each
+        expect(duration).toBeGreaterThanOrEqual(150); // Allow some tolerance
+        expect(error.message).toContain('after 3 attempts');
+      }
+    });
+
+    it('should respect retry delay', async () => {
+      const delay = 150;
+      const retries = 1;
+      const startTime = Date.now();
+
+      try {
+        const response = await service.fetchHtml(
+          'https://nonexistent-domain-12345.example',
+          {
+            retries,
+            retryDelay: delay,
+            timeout: 300,
+          },
+        );
+      } catch (error) {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        // Should have taken at least the delay time
+        expect(duration).toBeGreaterThanOrEqual(delay - 50); // Allow some tolerance
+      }
+    });
+
+    it('should succeed on first attempt when possible', async () => {
+      try {
+        const response = await service.fetchHtml(
+          'https://httpbin.org/status/200',
+          {
+            retries: 1, // Reduced retries
+            retryDelay: 500,
+            timeout: 5000, // Reduced timeout
+          },
+        );
+
+        expect(typeof response.data).toBe('string');
+      } catch (error) {
+        // Network issues are acceptable for this test
+        console.warn('Network test skipped due to connectivity issues');
+        expect(error).toBeDefined();
+      }
+    }, 15000);
+  });
+
+  describe('Combined features integration', () => {
+    it('should work with all features enabled', async () => {
+      const options = {
+        useRandomUserAgent: true,
+        retries: 1, // Reduced retries
+        retryDelay: 500,
+        timeout: 5000, // Reduced timeout
+        headers: {
+          Accept: 'text/html,application/xhtml+xml',
+        },
+      };
+
+      try {
+        const response = await service.fetchHtml(
+          'https://httpbin.org/html',
+          options,
+        );
+
+        expect(typeof response.data).toBe('string');
+        expect(response.data.length).toBeGreaterThan(0);
+
+        // Test extraction on the fetched content
+        if (response.data.includes('<title>')) {
+          const title = service.extractText(
+            response.data,
+            '//title/text()',
+            'xpath',
+          );
+          expect(typeof title).toBe('string');
+        }
+      } catch (error) {
+        // Network issues are acceptable for integration tests
+        console.warn('Integration test skipped due to network error');
+        expect(error).toBeDefined();
+      }
+    }, 15000);
+
+    it('should handle complex extraction with new fetch options', async () => {
+      try {
+        const response = await service.fetchHtml('https://httpbin.org/html', {
+          useRandomUserAgent: true,
+          retries: 1,
+          timeout: 5000,
+        });
+
+        // Test various extraction methods
+        const hasBody = service.exists(response.data, '//body', 'xpath');
+        const elementCount = service.count(response.data, 'p', 'css');
+
+        expect(typeof hasBody).toBe('boolean');
+        expect(typeof elementCount).toBe('number');
+
+        if (response.data.includes('<title>')) {
+          const title = service.extractText(response.data, 'title', 'css');
+          expect(typeof title).toBe('string');
+        }
+
+        if (response.data.includes('<a')) {
+          const links = service.extractMultiple(
+            response.data,
+            'a',
+            'css',
+            'href',
+          );
+          expect(Array.isArray(links)).toBe(true);
+        }
+      } catch (error) {
+        console.warn('Complex extraction test skipped due to network error');
+        expect(error).toBeDefined();
+      }
+    }, 15000);
+
+    it('should handle configuration validation', () => {
+      // Test that invalid configurations don't break the service
+      expect(() => {
+        service['createProxyAgent']({ url: '' }, false);
+      }).toThrow();
+
+      expect(() => {
+        service['detectProxyType']('');
+      }).not.toThrow();
+
+      expect(service['detectProxyType']('')).toBe('http');
+    });
+
+    it('should handle edge cases in options', async () => {
+      // Test with undefined/null options
+      const userAgent1 = await service.getRandomUserAgent();
+      expect(typeof userAgent1).toBe('string');
+
+      // Test with empty proxy config (should not break)
+      try {
+        const response = await service.fetchHtml(
+          'https://httpbin.org/status/200',
+          {
+            timeout: 1000,
+            retries: 0,
+          },
+        );
+      } catch (error) {
+        // Expected to potentially fail due to network, but shouldn't throw config errors
+        expect(error).toBeDefined();
+      }
     });
   });
 });

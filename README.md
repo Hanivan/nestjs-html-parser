@@ -1,105 +1,16 @@
+# NestJS HTML Parser
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+<p align="center">A powerful NestJS package for parsing HTML content using XPath (primary) and CSS selectors (secondary) with comprehensive extraction capabilities.</p>
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+<p align="center">
+  <a href="https://www.npmjs.com/package/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/v/nestjs-html-parser.svg" alt="NPM Version" /></a>
+  <a href="https://www.npmjs.com/package/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/l/nestjs-html-parser.svg" alt="Package License" /></a>
+  <a href="https://www.npmjs.com/package/nestjs-html-parser" target="_blank"><img src="https://img.shields.io/npm/dm/nestjs-html-parser.svg" alt="NPM Downloads" /></a>
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ yarn install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ yarn run start
-
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ yarn run test
-
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
-# NestJS HTML Parser
-
-A powerful NestJS package for parsing HTML content using XPath (primary) and CSS selectors (secondary) with comprehensive extraction capabilities.
 
 ## Features
 
@@ -111,12 +22,140 @@ A powerful NestJS package for parsing HTML content using XPath (primary) and CSS
 - **📚 List Extraction**: Extract arrays of structured data
 - **🌐 HTTP Fetching**: Built-in HTML fetching with customizable options
 - **🛡️ Error Handling**: Graceful error handling and fallbacks
+- **🔄 Random User Agents**: Built-in random user agent generation for stealth scraping
+- **🔗 Proxy Support**: HTTP, HTTPS, and SOCKS proxy support with authentication
+- **🔁 Retry Logic**: Configurable retry mechanism with exponential backoff
 - **🧪 Fully Tested**: Comprehensive test suite with real-world examples
+
+## Proxy & User Agent Features
+
+### Random User Agents
+
+The package includes built-in support for random user agent generation using `@ahmedrangel/rand-user-agent`:
+
+```typescript
+// Generate a random user agent
+const randomUA = await htmlParser.getRandomUserAgent();
+console.log(randomUA);
+// Output: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...
+
+// Fetch with random user agent
+const html = await htmlParser.fetchHtml('https://example.com', {
+  useRandomUserAgent: true
+});
+```
+
+### Proxy Support
+
+Full proxy support with multiple protocols and authentication:
+
+```typescript
+import { ProxyConfig } from 'nestjs-html-parser';
+
+// HTTP Proxy with separate credentials
+const httpProxy: ProxyConfig = {
+  url: 'http://proxy.example.com:8080',
+  type: 'http',
+  username: 'your-username', // optional
+  password: 'your-password'  // optional
+};
+
+// HTTP Proxy with credentials in URL
+const httpProxyWithUrlCreds: ProxyConfig = {
+  url: 'http://username:password@proxy.example.com:8080',
+  type: 'http'
+};
+
+// SOCKS5 Proxy with URL credentials
+const socksProxy: ProxyConfig = {
+  url: 'socks5://username:password@proxy.example.com:1080',
+  type: 'socks5'
+};
+
+// Mixed credentials (separate fields take precedence)
+const mixedProxy: ProxyConfig = {
+  url: 'http://olduser:oldpass@proxy.example.com:8080',
+  username: 'newuser',    // This will be used
+  password: 'newpass',    // This will be used
+  type: 'http'
+};
+
+// Use proxy with random user agent
+const html = await htmlParser.fetchHtml('https://example.com', {
+  proxy: httpProxy,
+  useRandomUserAgent: true,
+  retries: 3,
+  retryDelay: 2000
+});
+
+// Test proxy connection
+const isWorking = await htmlParser.testProxy(httpProxy);
+console.log(`Proxy status: ${isWorking ? 'Working' : 'Failed'}`);
+```
+
+#### Supported Proxy Formats
+
+```typescript
+// 1. Separate credentials (classic method)
+{
+  url: 'http://proxy.example.com:8080',
+  username: 'user',
+  password: 'pass'
+}
+
+// 2. Credentials in URL (new method)
+{
+  url: 'http://user:pass@proxy.example.com:8080'
+}
+
+// 3. SOCKS with URL credentials
+{
+  url: 'socks5://user:pass@proxy.example.com:1080'
+}
+
+// 4. Mixed (separate credentials override URL credentials)
+{
+  url: 'http://ignored:ignored@proxy.example.com:8080',
+  username: 'actual-user',    // Takes precedence
+  password: 'actual-pass'     // Takes precedence
+}
+```
+
+### Advanced Fetching Options
+
+```typescript
+const html = await htmlParser.fetchHtml('https://example.com', {
+  // User Agent options
+  useRandomUserAgent: true,        // Use random user agent
+  userAgent: 'Custom-Bot/1.0',     // Or specify custom user agent
+  
+  // Proxy configuration
+  proxy: {
+    url: 'socks5://proxy.example.com:1080',
+    type: 'socks5',
+    username: 'user',
+    password: 'pass'
+  },
+  
+  // Retry configuration
+  retries: 3,                      // Number of retry attempts
+  retryDelay: 1000,               // Delay between retries (ms)
+  
+  // Standard options
+  timeout: 15000,                 // Request timeout
+  headers: {                      // Custom headers
+    'Accept': 'text/html,application/xhtml+xml',
+    'Accept-Language': 'en-US,en;q=0.9'
+  }
+});
+```
 
 ## Installation
 
 ```bash
 yarn add nestjs-html-parser
+# or
+npm install nestjs-html-parser
 ```
 
 ## Quick Start
@@ -144,21 +183,120 @@ export class YourService {
   constructor(private readonly htmlParser: HtmlParserService) {}
 
   async parseHackerNews() {
-    const html = await this.htmlParser.fetchHtml('https://news.ycombinator.com/');
+    // Fetch HTML with response metadata
+    const response = await this.htmlParser.fetchHtml('https://news.ycombinator.com/');
     
-    // Extract page title
-    const title = this.htmlParser.extractSingle(html, '//title/text()');
+    console.log(`Status: ${response.status} ${response.statusText}`);
+    console.log(`Content-Type: ${response.headers['content-type']}`);
+    
+    // Extract page title from the HTML data
+    const title = this.htmlParser.extractSingle(response.data, '//title/text()');
     
     // Extract all story titles
     const storyTitles = this.htmlParser.extractMultiple(
-      html, 
+      response.data, 
       '//span[@class="titleline"]/a/text()'
     );
     
-    return { title, storyTitles };
+    return { title, storyTitles, status: response.status };
   }
 }
 ```
+
+## fetchHtml Response Format
+
+The `fetchHtml` method returns a `HtmlFetchResponse` object with complete HTTP response information:
+
+```typescript
+interface HtmlFetchResponse {
+  data: string;           // HTML content
+  headers: Record<string, string>; // Response headers
+  status: number;         // HTTP status code (200, 404, etc.)
+  statusText: string;     // HTTP status text ("OK", "Not Found", etc.)
+}
+
+// Example usage
+const response = await htmlParser.fetchHtml('https://example.com');
+
+console.log(`Content: ${response.data}`);
+console.log(`Status: ${response.status} ${response.statusText}`);
+console.log(`Content-Type: ${response.headers['content-type']}`);
+console.log(`Server: ${response.headers.server}`);
+
+// Use the HTML data for extraction
+const title = htmlParser.extractSingle(response.data, '//title/text()');
+```
+
+### Practical Examples
+
+```typescript
+// Example 1: Status-based conditional processing
+const response = await htmlParser.fetchHtml('https://example.com');
+
+if (response.status === 200) {
+  // Success - process content
+  const title = htmlParser.extractSingle(response.data, '//title/text()');
+  console.log(`Page title: ${title}`);
+} else if (response.status === 404) {
+  console.log('Page not found');
+} else {
+  console.log(`Error: ${response.status} ${response.statusText}`);
+}
+
+// Example 2: Content-type based processing
+const contentType = response.headers['content-type'];
+if (contentType?.includes('text/html')) {
+  // Process HTML content
+  const links = htmlParser.extractMultiple(response.data, 'a', 'css', 'href');
+} else if (contentType?.includes('application/json')) {
+  // Handle JSON response
+  const jsonData = JSON.parse(response.data);
+}
+
+// Example 3: Server and performance analysis
+console.log(`Server: ${response.headers.server}`);
+console.log(`Content-Length: ${response.headers['content-length']}`);
+console.log(`Cache-Control: ${response.headers['cache-control']}`);
+
+// Example 4: Comprehensive response analysis
+const analysisReport = {
+  url: 'https://example.com',
+  status: response.status,
+  statusText: response.statusText,
+  server: response.headers.server,
+  contentType: response.headers['content-type'],
+  contentLength: response.data.length,
+  hasTitle: htmlParser.exists(response.data, '//title'),
+  linkCount: htmlParser.count(response.data, 'a', 'css'),
+  timestamp: new Date().toISOString()
+};
+```
+
+## Demo Scripts
+
+For convenience, we've included npm/yarn scripts to run the examples easily:
+
+```bash
+# Show available demos
+yarn demo
+
+# Run Hacker News parsing demo
+yarn demo:hackernews
+
+# Run Japanese learning website (Watanoc) parsing demo
+yarn demo:watanoc
+
+# Run proxy and user agent demo
+yarn demo:proxy
+
+# Run HtmlFetchResponse features demo
+yarn demo:response
+
+# Run all demos sequentially
+yarn demo:all
+```
+
+These scripts provide an easy way to see the HTML parser in action with real-world websites, demonstrating various parsing techniques, proxy usage, and random user agent capabilities.
 
 ## API Reference
 
@@ -234,6 +372,32 @@ Count matching elements.
 const commentCount = htmlParser.count(html, '//div[@class="comment"]');
 ```
 
+#### `getRandomUserAgent(): Promise<string>`
+
+Generate a random user agent string.
+
+```typescript
+const randomUA = await htmlParser.getRandomUserAgent();
+console.log(randomUA);
+// Output: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...
+```
+
+#### `testProxy(proxy: ProxyConfig, testUrl?: string): Promise<boolean>`
+
+Test if a proxy connection is working.
+
+```typescript
+const proxyConfig = {
+  url: 'http://proxy.example.com:8080',
+  type: 'http' as const,
+  username: 'user',
+  password: 'pass'
+};
+
+const isWorking = await htmlParser.testProxy(proxyConfig);
+console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
+```
+
 ### Advanced Methods
 
 #### `extractStructured(html: string, schema: ExtractionSchema): Record<string, any>`
@@ -292,7 +456,9 @@ const articles = htmlParser.extractStructuredList(
 );
 ```
 
-## Real-World Example: Hacker News Scraper
+## Real-World Examples
+
+### Hacker News Scraper
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -351,6 +517,132 @@ export class HackerNewsService {
     );
   }
 }
+```
+
+### Japanese Learning Website (Watanoc.com)
+
+This example demonstrates parsing a Japanese learning website with multi-language content, categories, and educational metadata.
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { HtmlParserService, ExtractionSchema } from 'nestjs-html-parser';
+
+@Injectable()
+export class JapaneseLearningService {
+  constructor(private readonly htmlParser: HtmlParserService) {}
+
+  async getJapaneseLearningArticles() {
+    const html = await this.htmlParser.fetchHtml('https://watanoc.com/');
+
+    // Extract articles with difficulty levels and categories
+    const articleSchema: ExtractionSchema = {
+      title: {
+        selector: './/h1/text() | .//h2/text() | .//h3/text()',
+        type: 'xpath'
+      },
+      englishTitle: {
+        selector: './/text()[contains(., "Shaved ice") or contains(., "Oiled Ramen") or contains(., "Vietnamese sandwich")]',
+        type: 'xpath'
+      },
+      difficulty: {
+        selector: './/text()[contains(., "n3") or contains(., "n4") or contains(., "n5")]',
+        type: 'xpath',
+        transform: (value: string) => {
+          const match = value.match(/(n[3-5])/);
+          return match ? match[1] : null;
+        }
+      },
+      author: {
+        selector: './/text()[contains(., "avatar")]',
+        type: 'xpath',
+        transform: (value: string) => value.replace('avatar', '').trim()
+      },
+      date: {
+        selector: './/text()[contains(., "年") and contains(., "月") and contains(., "日")]',
+        type: 'xpath'
+      },
+      category: {
+        selector: './/text()[contains(., "食事") or contains(., "観光") or contains(., "イベント") or contains(., "文化")]',
+        type: 'xpath'
+      }
+    };
+
+    const articles = this.htmlParser.extractStructuredList(
+      html,
+      '//div[contains(text(), "肉玉そば") or contains(text(), "油そば") or contains(text(), "牛丼")]/..',
+      articleSchema
+    );
+
+    return articles;
+  }
+
+  async analyzeEducationalContent() {
+    const html = await this.htmlParser.fetchHtml('https://watanoc.com/');
+
+    // Analyze different types of educational content
+    const hasListening = this.htmlParser.exists(
+      html, 
+      '//text()[contains(., "リスニング") or contains(., "Listening")]'
+    );
+    
+    const hasQuiz = this.htmlParser.exists(
+      html, 
+      '//text()[contains(., "クイズ") or contains(., "Quiz")]'
+    );
+
+    // Count articles by difficulty level
+    const n3Count = this.htmlParser.count(html, '//text()[contains(., "n3")]');
+    const n4Count = this.htmlParser.count(html, '//text()[contains(., "n4")]');
+    const n5Count = this.htmlParser.count(html, '//text()[contains(., "n5")]');
+
+    // Extract categories
+    const categories = this.htmlParser.extractMultiple(
+      html,
+      '//text()[contains(., "しょくじ") or contains(., "かんこう") or contains(., "イベント")]'
+    );
+
+    return {
+      features: {
+        hasListening,
+        hasQuiz
+      },
+      distribution: {
+        n3: n3Count,
+        n4: n4Count,
+        n5: n5Count
+      },
+      categories: [...new Set(categories)]
+    };
+  }
+}
+```
+
+### Key Features Demonstrated:
+
+1. **Multi-language Content**: Extracting both Japanese and English content
+2. **Educational Metadata**: Difficulty levels (N3, N4, N5) and learning categories
+3. **Date Parsing**: Japanese date format extraction
+4. **Category Analysis**: Food (しょくじ), sightseeing (かんこう), events (イベント)
+5. **Content Analytics**: Counting articles by difficulty and analyzing features
+6. **Cultural Content**: Author names in different scripts and international tags
+
+## Complete Examples
+
+For complete working examples, see:
+- `src/examples/news.ycombinator.com.ts` - Comprehensive Hacker News parsing
+- `src/examples/watanoc.com.ts` - Japanese learning website parsing
+- `src/examples/proxy-and-useragent.ts` - Proxy and random user agent usage
+
+Run examples:
+```bash
+# Run Hacker News example
+yarn ts-node src/examples/news.ycombinator.com.ts
+
+# Run Watanoc example  
+yarn ts-node src/examples/watanoc.com.ts
+
+# Run Proxy & User Agent example
+yarn ts-node src/examples/proxy-and-useragent.ts
 ```
 
 ## Schema Configuration
@@ -440,9 +732,21 @@ const exists = htmlParser.exists(html, '//nonexistent'); // returns false
 const count = htmlParser.count(html, '//nonexistent'); // returns 0
 ```
 
-## Testing
+## Development
 
-Run the test suite:
+### Project Setup
+
+```bash
+yarn install
+```
+
+### Build
+
+```bash
+yarn build
+```
+
+### Testing
 
 ```bash
 # Run all tests
@@ -479,3 +783,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Data Extraction
 - HTML Processing
 - DOM Parsing
+- Proxy
+- User Agent
+- Random User Agent
+- Web Scraping

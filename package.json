@@ -1,7 +1,7 @@
 {
   "name": "nestjs-html-parser",
   "version": "0.0.1",
-  "description": "A NestJS package for parsing HTML content using XPath (primary) and CSS selectors (secondary) with comprehensive extraction capabilities",
+  "description": "A powerful NestJS HTML parsing service with XPath and CSS selector support, proxy configuration, random user agents, and rich response metadata including headers and status codes",
   "author": "Hanivan Rizky Sobari <hanivan20@gmail.com>",
   "private": false,
   "license": "MIT",
@@ -23,17 +23,26 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "demo": "echo \"Available demos:\n  yarn demo:hackernews - Parse Hacker News\n  yarn demo:watanoc - Parse Japanese learning site\n  yarn demo:proxy - Proxy and User Agent demo\n  yarn demo:response - HtmlFetchResponse demo\n  yarn demo:all - Run all demos\"",
+    "demo:hackernews": "ts-node src/examples/news.ycombinator.com.ts",
+    "demo:watanoc": "ts-node src/examples/watanoc.com.ts",
+    "demo:proxy": "ts-node src/examples/proxy-and-useragent.ts",
+    "demo:response": "ts-node src/examples/html-fetch-response.ts",
+    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response"
   },
   "dependencies": {
+    "@ahmedrangel/rand-user-agent": "^2.0.23",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "axios": "^1.9.0",
     "cheerio": "^1.0.0",
+    "https-proxy-agent": "^7.0.6",
     "jsdom": "^26.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socks-proxy-agent": "^8.0.5",
     "xpath": "^0.0.34",
     "xpath-ts": "^1.3.13"
   },
@@ -90,6 +99,10 @@
     "xpath",
     "css-selector",
     "scraping",
-    "extraction"
+    "extraction",
+    "proxy",
+    "user-agent",
+    "random-user-agent",
+    "web-scraping"
   ]
 }
