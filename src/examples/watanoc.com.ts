@@ -1,4 +1,5 @@
-import { ExtractionSchema, HtmlParserService } from '../html-parser.service';
+import { HtmlParserService } from '../html-parser.service';
+import { ExtractionSchema } from '../types';
 
 async function demonstrateWatanocParser() {
   const parser = new HtmlParserService();

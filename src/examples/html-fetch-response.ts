@@ -1,4 +1,5 @@
-import { HtmlFetchResponse, HtmlParserService } from '../html-parser.service';
+import { HtmlParserService } from '../html-parser.service';
+import { HtmlFetchResponse } from '../types';
 
 /**
  * Example demonstrating HtmlFetchResponse usage

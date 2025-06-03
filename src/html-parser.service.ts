@@ -4,39 +4,12 @@ import * as cheerio from 'cheerio';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { JSDOM } from 'jsdom';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-
-export interface ProxyConfig {
-  url: string;
-  type?: 'http' | 'https' | 'socks4' | 'socks5';
-  username?: string;
-  password?: string;
-}
-
-export interface HtmlFetchResponse {
-  data: string;
-  headers: Record<string, string>;
-  status: number;
-  statusText: string;
-}
-
-export interface ExtractionSchema {
-  [key: string]: {
-    selector: string;
-    type: 'xpath' | 'css';
-    attribute?: string;
-    transform?: (value: string) => any;
-  };
-}
-
-export interface HtmlParserOptions {
-  timeout?: number;
-  headers?: Record<string, string>;
-  userAgent?: string;
-  useRandomUserAgent?: boolean;
-  proxy?: ProxyConfig;
-  retries?: number;
-  retryDelay?: number;
-}
+import {
+  ExtractionSchema,
+  HtmlFetchResponse,
+  HtmlParserOptions,
+  ProxyConfig,
+} from './types';
 
 @Injectable()
 export class HtmlParserService {

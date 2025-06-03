@@ -787,3 +787,105 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - User Agent
 - Random User Agent
 - Web Scraping
+
+## Types and Interfaces
+
+The package exports comprehensive TypeScript interfaces for type safety and better development experience.
+
+### Core Types
+
+```typescript
+import {
+  HtmlParserService,
+  HtmlFetchResponse,
+  HtmlParserOptions,
+  ProxyConfig,
+  ExtractionSchema
+} from 'nestjs-html-parser';
+```
+
+### HtmlFetchResponse
+
+Complete HTTP response information returned by `fetchHtml`:
+
+```typescript
+interface HtmlFetchResponse {
+  data: string;                    // HTML content
+  headers: Record<string, string>; // Response headers
+  status: number;                  // HTTP status code (200, 404, etc.)
+  statusText: string;              // HTTP status text ("OK", "Not Found", etc.)
+}
+```
+
+### HtmlParserOptions
+
+Configuration options for HTML fetching:
+
+```typescript
+interface HtmlParserOptions {
+  timeout?: number;                // Request timeout in milliseconds
+  headers?: Record<string, string>; // Custom HTTP headers
+  userAgent?: string;              // Custom user agent string
+  useRandomUserAgent?: boolean;    // Use random user agent
+  proxy?: ProxyConfig;             // Proxy configuration
+  retries?: number;                // Number of retry attempts
+  retryDelay?: number;             // Delay between retries in milliseconds
+}
+```
+
+### ProxyConfig
+
+Proxy server configuration:
+
+```typescript
+interface ProxyConfig {
+  url: string;                                        // Proxy URL
+  type?: 'http' | 'https' | 'socks4' | 'socks5';    // Proxy type
+  username?: string;                                  // Proxy username
+  password?: string;                                  // Proxy password
+}
+
+// Examples:
+const httpProxy: ProxyConfig = {
+  url: 'http://proxy.example.com:8080',
+  type: 'http'
+};
+
+const socksWithCreds: ProxyConfig = {
+  url: 'socks5://user:pass@proxy.example.com:1080',
+  type: 'socks5'
+};
+```
+
+### ExtractionSchema
+
+Schema for structured data extraction:
+
+```typescript
+interface ExtractionSchema {
+  [key: string]: {
+    selector: string;                    // XPath or CSS selector
+    type: 'xpath' | 'css';              // Selector type
+    attribute?: string;                  // Attribute to extract
+    transform?: (value: string) => any;  // Transform function
+  };
+}
+
+// Example:
+const articleSchema: ExtractionSchema = {
+  title: {
+    selector: '//h1/text()',
+    type: 'xpath'
+  },
+  author: {
+    selector: '.author',
+    type: 'css'
+  },
+  publishDate: {
+    selector: 'time',
+    type: 'css',
+    attribute: 'datetime',
+    transform: (value: string) => new Date(value)
+  }
+};
+```

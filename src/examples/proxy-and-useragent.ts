@@ -1,4 +1,5 @@
-import { HtmlParserService, ProxyConfig } from '../html-parser.service';
+import { HtmlParserService } from '../html-parser.service';
+import { ProxyConfig } from '../types';
 
 /**
  * Example demonstrating proxy and random user agent usage
