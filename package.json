@@ -37,12 +37,18 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepublishOnly": "yarn build",
-    "demo": "echo \"Available demos:\n  yarn demo:hackernews - Parse Hacker News\n  yarn demo:watanoc - Parse Japanese learning site\n  yarn demo:proxy - Proxy and User Agent demo\n  yarn demo:response - HtmlFetchResponse demo\n  yarn demo:all - Run all demos\"",
+    "demo": "echo \"Available demos:\n  yarn demo:hackernews - Parse Hacker News\n  yarn demo:watanoc - Parse Japanese learning site\n  yarn demo:otakudesu - Parse Indonesian anime site (Otakudesu)\n  yarn demo:proxy - Proxy and User Agent demo\n  yarn demo:response - HtmlFetchResponse demo\n  yarn demo:all - Run all demos\n\nVerbose mode (shows detailed errors):\n  yarn demo:hackernews:verbose\n  yarn demo:watanoc:verbose\n  yarn demo:otakudesu:verbose\n  yarn demo:proxy:verbose\n  yarn demo:response:verbose\"",
     "demo:hackernews": "ts-node src/examples/news.ycombinator.com.ts",
     "demo:watanoc": "ts-node src/examples/watanoc.com.ts",
+    "demo:otakudesu": "ts-node src/examples/otakudesu.cloud.ts",
     "demo:proxy": "ts-node src/examples/proxy-and-useragent.ts",
     "demo:response": "ts-node src/examples/html-fetch-response.ts",
-    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response"
+    "demo:hackernews:verbose": "ts-node src/examples/news.ycombinator.com.ts --verbose",
+    "demo:watanoc:verbose": "ts-node src/examples/watanoc.com.ts --verbose",
+    "demo:otakudesu:verbose": "ts-node src/examples/otakudesu.cloud.ts --verbose",
+    "demo:proxy:verbose": "ts-node src/examples/proxy-and-useragent.ts --verbose",
+    "demo:response:verbose": "ts-node src/examples/html-fetch-response.ts --verbose",
+    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:otakudesu && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response"
   },
   "dependencies": {
     "@ahmedrangel/rand-user-agent": "^2.0.23",
@@ -64,6 +70,7 @@
     "@swc/cli": "^0.6.0",
     "@swc/core": "^1.10.7",
     "@types/cheerio": "^0.22.35",
+    "@types/jest": "^29.5.14",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^22.10.7",
     "@types/supertest": "^6.0.2",

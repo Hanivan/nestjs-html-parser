@@ -19,9 +19,33 @@ export class HtmlParserService {
     useRandomUserAgent: false,
     retries: 3,
     retryDelay: 1000,
+    verbose: false,
   };
 
-  constructor() {}
+  // Store original console methods for restoring
+  private originalConsoleError: any;
+  private originalConsoleWarn: any;
+
+  constructor() {
+    this.originalConsoleError = console.error;
+    this.originalConsoleWarn = console.warn;
+  }
+
+  /**
+   * Suppress console output when verbose is false
+   */
+  private suppressConsole(): void {
+    console.error = () => {};
+    console.warn = () => {};
+  }
+
+  /**
+   * Restore console output
+   */
+  private restoreConsole(): void {
+    console.error = this.originalConsoleError;
+    console.warn = this.originalConsoleWarn;
+  }
 
   /**
    * Fetch HTML content from a URL with support for random user agents and proxies
@@ -200,35 +224,47 @@ export class HtmlParserService {
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
+    options?: { verbose?: boolean },
   ): string | null {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+
     try {
       if (type === 'xpath') {
-        return this.extractSingleXPath(html, selector, attribute);
+        return this.extractSingleXPath(html, selector, attribute, verbose);
       } else {
         return this.extractSingleCSS(html, selector, attribute);
       }
     } catch (error) {
-      throw new Error(`Failed to extract single value: ${error.message}`);
+      if (verbose) {
+        console.error('Error in extractSingle:', error);
+      }
+      return null;
     }
   }
 
   /**
-   * Extract multiple matching values
+   * Extract multiple values using XPath (primary) or CSS selector (secondary)
    */
   extractMultiple(
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
+    options?: { verbose?: boolean },
   ): string[] {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+
     try {
       if (type === 'xpath') {
-        return this.extractMultipleXPath(html, selector, attribute);
+        return this.extractMultipleXPath(html, selector, attribute, verbose);
       } else {
         return this.extractMultipleCSS(html, selector, attribute);
       }
     } catch (error) {
-      throw new Error(`Failed to extract multiple values: ${error.message}`);
+      if (verbose) {
+        console.error('Error in extractMultiple:', error);
+      }
+      return [];
     }
   }
 
@@ -239,31 +275,47 @@ export class HtmlParserService {
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
+    options?: { verbose?: boolean },
   ): string | null {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+
     try {
       if (type === 'xpath') {
-        return this.extractSingleXPath(html, selector);
+        return this.extractSingleXPath(html, selector, undefined, verbose);
       } else {
         return this.extractSingleCSS(html, selector);
       }
     } catch (error) {
-      throw new Error(`Failed to extract text: ${error.message}`);
+      if (verbose) {
+        console.error('Error in extractText:', error);
+      }
+      return null;
     }
   }
 
   /**
-   * Extract attribute values
+   * Extract attribute values from multiple elements
    */
   extractAttributes(
     html: string,
     selector: string,
     attribute: string,
     type: 'xpath' | 'css' = 'xpath',
+    options?: { verbose?: boolean },
   ): string[] {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+
     try {
-      return this.extractMultiple(html, selector, type, attribute);
+      if (type === 'xpath') {
+        return this.extractMultipleXPath(html, selector, attribute, verbose);
+      } else {
+        return this.extractMultipleCSS(html, selector, attribute);
+      }
     } catch (error) {
-      throw new Error(`Failed to extract attributes: ${error.message}`);
+      if (verbose) {
+        console.error('Error in extractAttributes:', error);
+      }
+      return [];
     }
   }
 
@@ -274,15 +326,22 @@ export class HtmlParserService {
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
+    options?: { verbose?: boolean },
   ): boolean {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+
     try {
       if (type === 'xpath') {
-        return this.evaluateXPath(html, selector).length > 0;
+        const results = this.evaluateXPath(html, selector, verbose);
+        return results.length > 0;
       } else {
         const $ = cheerio.load(html);
         return $(selector).length > 0;
       }
     } catch (error) {
+      if (verbose) {
+        console.error('Error in exists:', error);
+      }
       return false;
     }
   }
@@ -294,114 +353,173 @@ export class HtmlParserService {
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
+    options?: { verbose?: boolean },
   ): number {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+
     try {
       if (type === 'xpath') {
-        return this.evaluateXPath(html, selector).length;
+        const results = this.evaluateXPath(html, selector, verbose);
+        return results.length;
       } else {
         const $ = cheerio.load(html);
         return $(selector).length;
       }
     } catch (error) {
+      if (verbose) {
+        console.error('Error in count:', error);
+      }
       return 0;
     }
   }
 
   /**
-   * Extract data using a schema object
+   * Extract structured data using a schema
    */
   extractStructured(
     html: string,
     schema: ExtractionSchema,
+    options?: { verbose?: boolean },
   ): Record<string, any> {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+    const result: Record<string, any> = {};
+
     try {
-      const result: Record<string, any> = {};
-
       for (const [key, config] of Object.entries(schema)) {
-        const value = this.extractSingle(
-          html,
-          config.selector,
-          config.type,
-          config.attribute,
-        );
+        try {
+          let value: any;
 
-        if (value !== null) {
-          result[key] = config.transform ? config.transform(value) : value;
-        } else {
+          if (config.type === 'xpath') {
+            value = this.extractSingleXPath(
+              html,
+              config.selector,
+              config.attribute,
+              verbose,
+            );
+          } else {
+            value = this.extractSingleCSS(
+              html,
+              config.selector,
+              config.attribute,
+            );
+          }
+
+          // Apply transformation if provided
+          if (value && config.transform) {
+            value = config.transform(value);
+          }
+
+          result[key] = value;
+        } catch (error) {
+          if (verbose) {
+            console.error(`Error extracting field '${key}':`, error);
+          }
           result[key] = null;
         }
       }
-
-      return result;
     } catch (error) {
-      throw new Error(`Failed to extract structured data: ${error.message}`);
+      if (verbose) {
+        console.error('Error in extractStructured:', error);
+      }
     }
+
+    return result;
   }
 
   /**
-   * Extract arrays of structured data
+   * Extract array of structured data
    */
   extractStructuredList(
     html: string,
     containerSelector: string,
     schema: ExtractionSchema,
     containerType: 'xpath' | 'css' = 'xpath',
+    options?: { verbose?: boolean },
   ): Record<string, any>[] {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+    const results: Record<string, any>[] = [];
+
     try {
-      const results: Record<string, any>[] = [];
+      let containers: any[];
 
       if (containerType === 'xpath') {
-        const elements = this.evaluateXPath(html, containerSelector);
-        for (const element of elements) {
-          const containerHtml =
-            (element as any).outerHTML || this.getElementHTML(element);
-          const item = this.extractStructured(containerHtml, schema);
-          results.push(item);
-        }
+        containers = this.evaluateXPath(html, containerSelector, verbose);
       } else {
         const $ = cheerio.load(html);
-        $(containerSelector).each((_, element) => {
-          const containerHtml = $.html(element);
-          const item = this.extractStructured(containerHtml, schema);
-          results.push(item);
-        });
+        containers = $(containerSelector).toArray();
       }
 
-      return results;
+      for (const container of containers) {
+        const containerHTML = this.getElementHTML(container);
+        const item = this.extractStructured(containerHTML, schema, { verbose });
+        results.push(item);
+      }
     } catch (error) {
-      throw new Error(`Failed to extract structured list: ${error.message}`);
+      if (verbose) {
+        console.error('Error in extractStructuredList:', error);
+      }
     }
+
+    return results;
   }
 
-  // Private helper methods
-
-  private evaluateXPath(html: string, xpath: string): Node[] {
+  /**
+   * Evaluate XPath expression and return matching nodes
+   */
+  private evaluateXPath(html: string, xpath: string, verbose = false): Node[] {
     try {
-      const dom = new JSDOM(html, { contentType: 'text/html' });
-      const document = dom.window.document;
+      // Configure JSDOM with CSS error suppression
+      const virtualConsole = new (require('jsdom').VirtualConsole)();
 
-      // Create XPath evaluator
+      if (!verbose) {
+        // Suppress CSS and other non-critical errors
+        virtualConsole.on('error', () => {});
+        virtualConsole.on('warn', () => {});
+        virtualConsole.on('info', () => {});
+        virtualConsole.on('log', () => {});
+      } else {
+        // In verbose mode, still show errors but filter out CSS parsing ones
+        virtualConsole.on('error', (error) => {
+          if (!error.toString().includes('Could not parse CSS stylesheet')) {
+            console.error(error);
+          }
+        });
+        virtualConsole.on('warn', console.warn);
+      }
+
+      const dom = new JSDOM(html, {
+        virtualConsole,
+        resources: 'usable',
+        runScripts: 'outside-only',
+        pretendToBeVisual: false,
+      });
+
+      const document = dom.window.document;
       const result = document.evaluate(
         xpath,
         document,
         null,
-        dom.window.XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+        dom.window.XPathResult.ANY_TYPE,
         null,
       );
 
       const nodes: Node[] = [];
-      for (let i = 0; i < result.snapshotLength; i++) {
-        const node = result.snapshotItem(i);
-        if (node) {
-          nodes.push(node);
-        }
+      let node = result.iterateNext();
+      while (node) {
+        nodes.push(node);
+        node = result.iterateNext();
       }
 
       return nodes;
     } catch (error) {
+      if (verbose) {
+        console.error('XPath evaluation error:', error);
+      }
       return [];
     }
   }
+
+  // Private helper methods
 
   private getElementHTML(element: any): string {
     if (!element) return '';
@@ -421,11 +539,12 @@ export class HtmlParserService {
     html: string,
     selector: string,
     attribute?: string,
+    verbose = false,
   ): string | null {
     try {
       // Handle attribute selectors differently
       if (attribute && !selector.includes('/@')) {
-        const elements = this.evaluateXPath(html, selector);
+        const elements = this.evaluateXPath(html, selector, verbose);
         if (elements.length > 0) {
           const element = elements[0] as any;
           return element.getAttribute ? element.getAttribute(attribute) : null;
@@ -435,7 +554,7 @@ export class HtmlParserService {
 
       // Handle text() selectors
       if (selector.includes('/text()')) {
-        const elements = this.evaluateXPath(html, selector);
+        const elements = this.evaluateXPath(html, selector, verbose);
         if (elements.length > 0) {
           const textNode = elements[0] as any;
           return (
@@ -449,7 +568,7 @@ export class HtmlParserService {
 
       // Handle attribute selectors with /@
       if (selector.includes('/@')) {
-        const elements = this.evaluateXPath(html, selector);
+        const elements = this.evaluateXPath(html, selector, verbose);
         if (elements.length > 0) {
           const attrNode = elements[0] as any;
           return attrNode.value || attrNode.nodeValue || String(attrNode);
@@ -458,7 +577,7 @@ export class HtmlParserService {
       }
 
       // Handle regular element selectors
-      const elements = this.evaluateXPath(html, selector);
+      const elements = this.evaluateXPath(html, selector, verbose);
       if (elements.length > 0) {
         const element = elements[0] as any;
         if (attribute) {
@@ -469,6 +588,9 @@ export class HtmlParserService {
 
       return null;
     } catch (error) {
+      if (verbose) {
+        console.error('Error in extractSingleXPath:', error);
+      }
       return null;
     }
   }
@@ -477,13 +599,14 @@ export class HtmlParserService {
     html: string,
     selector: string,
     attribute?: string,
+    verbose = false,
   ): string[] {
     try {
       const results: string[] = [];
 
       // Handle attribute selectors differently
       if (attribute && !selector.includes('/@')) {
-        const elements = this.evaluateXPath(html, selector);
+        const elements = this.evaluateXPath(html, selector, verbose);
         for (const element of elements) {
           const value = (element as any).getAttribute
             ? (element as any).getAttribute(attribute)
@@ -495,7 +618,7 @@ export class HtmlParserService {
 
       // Handle text() selectors
       if (selector.includes('/text()')) {
-        const elements = this.evaluateXPath(html, selector);
+        const elements = this.evaluateXPath(html, selector, verbose);
         for (const element of elements) {
           const text =
             (element as any).nodeValue ||
@@ -508,7 +631,7 @@ export class HtmlParserService {
 
       // Handle attribute selectors with /@
       if (selector.includes('/@')) {
-        const elements = this.evaluateXPath(html, selector);
+        const elements = this.evaluateXPath(html, selector, verbose);
         for (const element of elements) {
           const value =
             (element as any).value ||
@@ -520,22 +643,22 @@ export class HtmlParserService {
       }
 
       // Handle regular element selectors
-      const elements = this.evaluateXPath(html, selector);
+      const elements = this.evaluateXPath(html, selector, verbose);
       for (const element of elements) {
-        if (attribute) {
-          const value = (element as any).getAttribute
+        const value = attribute
+          ? (element as any).getAttribute
             ? (element as any).getAttribute(attribute)
-            : null;
-          if (value) results.push(value);
-        } else {
-          const text =
-            (element as any).textContent || (element as any).innerText || '';
-          if (text.trim()) results.push(text.trim());
-        }
+            : null
+          : (element as any).textContent || (element as any).innerText || '';
+
+        if (value) results.push(value);
       }
 
       return results;
     } catch (error) {
+      if (verbose) {
+        console.error('Error in extractMultipleXPath:', error);
+      }
       return [];
     }
   }

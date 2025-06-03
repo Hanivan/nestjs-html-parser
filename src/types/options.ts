@@ -8,4 +8,5 @@ export interface HtmlParserOptions {
   proxy?: ProxyConfig;
   retries?: number;
   retryDelay?: number;
+  verbose?: boolean;
 }

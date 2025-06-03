@@ -25,7 +25,37 @@
 - **🔄 Random User Agents**: Built-in random user agent generation for stealth scraping
 - **🔗 Proxy Support**: HTTP, HTTPS, and SOCKS proxy support with authentication
 - **🔁 Retry Logic**: Configurable retry mechanism with exponential backoff
+- **🔇 Verbose Control**: Optional verbose mode for debugging (CSS errors suppressed by default)
 - **🧪 Fully Tested**: Comprehensive test suite with real-world examples
+
+## Verbose Mode & Error Handling
+
+By default, the library suppresses CSS parsing errors and other non-critical JSDOM warnings to provide clean output. You can enable verbose mode for debugging:
+
+```typescript
+// Suppress CSS errors and warnings (default)
+const title = htmlParser.extractSingle(html, '//title/text()');
+
+// Enable verbose mode for debugging
+const title = htmlParser.extractSingle(html, '//title/text()', 'xpath', undefined, { verbose: true });
+
+// Verbose mode in fetchHtml
+const response = await htmlParser.fetchHtml('https://example.com', {
+  verbose: true,  // Shows detailed errors and warnings
+  useRandomUserAgent: true
+});
+
+// Verbose mode in structured extraction
+const data = htmlParser.extractStructured(html, schema, { verbose: true });
+const list = htmlParser.extractStructuredList(html, '//div', schema, 'xpath', { verbose: true });
+```
+
+### Error Suppression Benefits
+
+- **Clean Output**: No noisy CSS parsing errors from websites with malformed CSS
+- **Better UX**: Focus on actual parsing errors, not browser rendering issues  
+- **Debugging Control**: Enable verbose mode only when needed
+- **Production Ready**: Silent operation by default for production use
 
 ## Proxy & User Agent Features
 
@@ -286,6 +316,9 @@ yarn demo:hackernews
 # Run Japanese learning website (Watanoc) parsing demo
 yarn demo:watanoc
 
+# Run Indonesian anime site (Otakudesu) parsing demo
+yarn demo:otakudesu
+
 # Run proxy and user agent demo
 yarn demo:proxy
 
@@ -294,7 +327,20 @@ yarn demo:response
 
 # Run all demos sequentially
 yarn demo:all
+
+# Verbose mode demos (show detailed errors and debugging info)
+yarn demo:hackernews:verbose
+yarn demo:watanoc:verbose
+yarn demo:otakudesu:verbose
+yarn demo:proxy:verbose
+yarn demo:response:verbose
 ```
+
+### Verbose Mode Benefits
+- **Clean Default Output**: No CSS parsing errors or JSDOM warnings
+- **Debug When Needed**: Enable verbose mode to see detailed error information
+- **Command Line Control**: Use `--verbose` or `-v` flags with ts-node directly
+- **Production Ready**: Silent operation by default for clean logs
 
 These scripts provide an easy way to see the HTML parser in action with real-world websites, demonstrating various parsing techniques, proxy usage, and random user agent capabilities.
 
@@ -631,6 +677,7 @@ export class JapaneseLearningService {
 For complete working examples, see:
 - `src/examples/news.ycombinator.com.ts` - Comprehensive Hacker News parsing
 - `src/examples/watanoc.com.ts` - Japanese learning website parsing
+- `src/examples/otakudesu.cloud.ts` - Indonesian anime site (Otakudesu) parsing
 - `src/examples/proxy-and-useragent.ts` - Proxy and random user agent usage
 
 Run examples:
@@ -640,6 +687,9 @@ yarn ts-node src/examples/news.ycombinator.com.ts
 
 # Run Watanoc example  
 yarn ts-node src/examples/watanoc.com.ts
+
+# Run Otakudesu example
+yarn ts-node src/examples/otakudesu.cloud.ts
 
 # Run Proxy & User Agent example
 yarn ts-node src/examples/proxy-and-useragent.ts
