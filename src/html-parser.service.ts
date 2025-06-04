@@ -6,6 +6,7 @@ import { JSDOM } from 'jsdom';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { HTML_PARSER_LOGGER_LEVEL } from './html-parser.config';
 import {
+  ExtractionOptions,
   ExtractionSchema,
   HtmlFetchResponse,
   HtmlParserOptions,
@@ -480,10 +481,7 @@ export class HtmlParserService {
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
-    options?: {
-      verbose?: boolean;
-      transform?: (value: string) => T;
-    },
+    options?: ExtractionOptions<T>,
   ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -510,7 +508,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided and result exists
       if (result !== null && options?.transform) {
-        return options.transform(result);
+        return this.applyTransform(result, options.transform);
       }
 
       // Return as T if no transform (assumes T extends string when no transform)
@@ -576,10 +574,7 @@ export class HtmlParserService {
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
-    options?: {
-      verbose?: boolean;
-      transform?: (value: string) => T;
-    },
+    options?: ExtractionOptions<T>,
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -619,7 +614,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided
       if (options?.transform) {
-        return results.map((result) => options.transform!(result));
+        return this.applyTransform(results, options.transform);
       }
 
       // Return as T[] if no transform (assumes T extends string when no transform)
@@ -673,10 +668,7 @@ export class HtmlParserService {
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
-    options?: {
-      verbose?: boolean;
-      transform?: (value: string) => T;
-    },
+    options?: ExtractionOptions<T>,
   ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -691,7 +683,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided and result exists
       if (result !== null && options?.transform) {
-        return options.transform(result);
+        return this.applyTransform(result, options.transform);
       }
 
       // Return as T if no transform (assumes T extends string when no transform)
@@ -754,10 +746,7 @@ export class HtmlParserService {
     selector: string,
     attribute: string,
     type: 'xpath' | 'css' = 'xpath',
-    options?: {
-      verbose?: boolean;
-      transform?: (value: string) => T;
-    },
+    options?: ExtractionOptions<T>,
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -772,7 +761,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided
       if (options?.transform) {
-        return results.map((result) => options.transform!(result));
+        return this.applyTransform(results, options.transform);
       }
 
       // Return as T[] if no transform (assumes T extends string when no transform)
@@ -1080,8 +1069,9 @@ export class HtmlParserService {
               }
             }
             // Apply transformation if provided
-            if (config.transform) {
-              value = value.map(config.transform);
+            const transform = config.transform;
+            if (transform) {
+              value = this.applyTransform(value, transform);
             }
           } else {
             // Use extractSingle for single value fields
@@ -1111,7 +1101,7 @@ export class HtmlParserService {
             }
             // Apply transformation if provided
             if (value && config.transform) {
-              value = config.transform(value);
+              value = this.applyTransform(value, config.transform);
             }
           }
 
@@ -1761,5 +1751,47 @@ export class HtmlParserService {
         // Retry unknown errors by default
         return true;
     }
+  }
+
+  /**
+   * Apply a transform (function, object with execute, class constructor, or array of these) to a value or array of values.
+   */
+  private applyTransform(value: any, transform: any): any {
+    if (!transform) return value;
+
+    const isClass = (t: any) => {
+      // Heuristic: class constructors have a prototype with a non-empty constructor
+      return (
+        typeof t === 'function' &&
+        t.prototype &&
+        t.prototype.constructor === t &&
+        Object.getOwnPropertyNames(t.prototype).includes('execute')
+      );
+    };
+
+    const executeTransform = (val: any, t: any): any => {
+      if (typeof t === 'function' && !isClass(t)) return t(val); // plain function
+      if (isClass(t)) {
+        const instance = new t();
+        if (typeof instance.execute === 'function')
+          return instance.execute(val);
+        return val;
+      }
+      if (t && typeof t === 'object' && typeof t.execute === 'function') {
+        return t.execute(val);
+      }
+      return val;
+    };
+
+    const applyToValue = (val: any, transforms: any): any => {
+      if (Array.isArray(transforms)) {
+        return transforms.reduce((acc, t) => executeTransform(acc, t), val);
+      }
+      return executeTransform(val, transforms);
+    };
+
+    return Array.isArray(value)
+      ? value.map((v) => applyToValue(v, transform))
+      : applyToValue(value, transform);
   }
 }

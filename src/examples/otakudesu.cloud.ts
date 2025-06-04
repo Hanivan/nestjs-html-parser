@@ -313,6 +313,60 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
       }
     }
 
+    // === Advanced Transform Example ===
+    // --- Example class definitions ---
+    class UppercasePipe {
+      execute(value: string) {
+        return value.toUpperCase();
+      }
+    }
+    class SuffixPipe {
+      constructor(private suffix: string) {}
+      execute(value: string) {
+        return value + this.suffix;
+      }
+    }
+    // --- Example usage: with and without 'new' keyword ---
+    // Type assertion is used here to allow class constructors in the transform array for demonstration.
+    const advancedSchema = {
+      title: {
+        selector: './/h2[@class="jdlflm"]/text()',
+        type: 'xpath' as 'xpath',
+        transform: [
+          (title: string) => title.trim(),
+          UppercasePipe as any, // <-- class, will be instantiated automatically
+          new SuffixPipe(' [ADVANCED]'), // <-- instance, used as is
+        ],
+      },
+      episode: {
+        selector: './/div[@class="epz"]',
+        type: 'xpath' as 'xpath',
+        transform: [
+          (text: any) => {
+            if (typeof text !== 'string') return 0;
+            let match = text.match(/Episode\s+(\d+)/i);
+            if (!match) match = text.match(/(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+          },
+          // SuffixPipe as any, // <-- class, will be instantiated with no args (suffix will be undefined)
+          new SuffixPipe(' (ep)'), // <-- instance, used as is
+        ],
+      },
+    };
+    const advancedAnime = parser.extractStructuredList(
+      response.data,
+      '//div[@class="venz"]//ul//li',
+      advancedSchema,
+      'xpath',
+      { verbose },
+    );
+    if (advancedAnime.length > 0) {
+      console.log('\n=== ADVANCED TRANSFORM EXAMPLE ===');
+      advancedAnime.slice(0, 3).forEach((anime, i) => {
+        console.log(`${i + 1}. ${anime.title} | Episode: ${anime.episode}`);
+      });
+    }
+
     // Demonstrate advanced parsing techniques
     console.log('\n🔬 ADVANCED PARSING TECHNIQUES');
     console.log('='.repeat(50));

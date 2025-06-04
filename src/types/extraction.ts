@@ -13,9 +13,15 @@ export interface ExtractionSchema<T = Record<string, any>> {
      */
     attribute?: string;
     /**
-     * Function to transform the extracted value
+     * Transform to apply to the extracted value. Can be:
+     * - a function (value: string) => any
+     * - an object with an execute(value: any) method
+     * - an array of such functions/objects (applied in order)
      */
-    transform?: (value: string) => any;
+    transform?:
+      | ((value: any) => any)
+      | { execute: (value: any) => any }
+      | (((value: any) => any) | { execute: (value: any) => any })[];
     /**
      * If true, extract an array of values instead of a single value
      */
@@ -41,9 +47,15 @@ export interface ExtractionField<T = any> {
    */
   attribute?: string;
   /**
-   * Function to transform the extracted value
+   * Transform to apply to the extracted value. Can be:
+   * - a function (value: string) => any
+   * - an object with an execute(value: any) method
+   * - an array of such functions/objects (applied in order)
    */
-  transform?: (value: string) => T;
+  transform?:
+    | ((value: any) => T)
+    | { execute: (value: any) => T }
+    | (((value: any) => T) | { execute: (value: any) => T })[];
   /**
    * If true, extract an array of values instead of a single value
    */
@@ -52,4 +64,18 @@ export interface ExtractionField<T = any> {
    * If true, return the raw HTML of the matched element(s) instead of text/attribute value
    */
   raw?: boolean;
+}
+
+export interface ExtractionOptions<T = any> {
+  verbose?: boolean;
+  /**
+   * Transform to apply to the extracted value. Can be:
+   * - a function (value: string) => T
+   * - an object with an execute(value: any) => T method
+   * - an array of such functions/objects (applied in order)
+   */
+  transform?:
+    | ((value: any) => T)
+    | { execute: (value: any) => T }
+    | (((value: any) => T) | { execute: (value: any) => T })[];
 }

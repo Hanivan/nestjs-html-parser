@@ -160,18 +160,41 @@ const links = htmlParser.extractMultiple(html, '//a/text()');
 // Attribute extraction
 const urls = htmlParser.extractAttributes(html, '//a', 'href');
 
-// Structured data extraction
+// Structured data extraction with advanced transform
+class UppercasePipe {
+  execute(value: string) {
+    return value.toUpperCase();
+  }
+}
+class SuffixPipe {
+  constructor(private suffix: string) {}
+  execute(value: string) {
+    return value + this.suffix;
+  }
+}
 const schema = {
-  title: { selector: '//h1/text()', type: 'xpath' },
-  author: { selector: '.author', type: 'css' },
-  date: { 
-    selector: 'time', 
-    type: 'css', 
-    attribute: 'datetime',
-    transform: (value: string) => new Date(value)
+  title: {
+    selector: '//h1/text()',
+    type: 'xpath',
+    transform: [
+      (title: string) => title.trim(),
+      UppercasePipe,
+      new SuffixPipe(' [ADVANCED]'),
+    ],
   },
-  links: { selector: '//a/@href', type: 'xpath', multiple: true },
-  titleHtml: { selector: '//h1', type: 'xpath', raw: true }
+  episode: {
+    selector: '//div[@class="epz"]',
+    type: 'xpath',
+    transform: [
+      (text: any) => {
+        if (typeof text !== 'string') return 0;
+        let match = text.match(/Episode\s+(\d+)/i);
+        if (!match) match = text.match(/(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      },
+      new SuffixPipe(' (ep)'),
+    ],
+  },
 };
 const data = htmlParser.extractStructured(html, schema);
 ```
@@ -336,6 +359,59 @@ const proxyConfig = {
 
 const isWorking = await htmlParser.testProxy(proxyConfig);
 console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
+```
+
+#### `transform` option in schema fields
+
+The `transform` property in a schema field is highly flexible. You can use:
+- A single function: `(value: string) => any`
+- A single class (constructor with an `execute` method): `class MyPipe { execute(value) { ... } }` (the parser will instantiate it automatically)
+- A single instance (object with an `execute` method): `new MyPipe()`
+- An array of any of the above (functions, classes, instances), which will be applied in order
+
+**Note:** The parser will always convert DOM elements to their text content before applying the transform, so your transform functions can safely expect a string.
+
+**Important:**
+If you use a class or object for `transform`, it **must** have a method named `execute(value)`. The parser will call this method with the extracted value.
+
+**Example of a valid custom class transform:**
+```typescript
+class MyCustomPipe {
+  execute(value: string) {
+    // your transformation logic
+    return value + '!';
+  }
+}
+
+// Usage:
+transform: MyCustomPipe
+// or
+transform: new MyCustomPipe()
+```
+
+**Examples:**
+```typescript
+// Single function
+transform: (value: string) => value.toUpperCase()
+
+// Single class
+transform: UppercasePipe
+
+// Single instance
+transform: new SuffixPipe('!')
+
+// Array of functions
+transform: [
+  (value: string) => value.trim(),
+  (value: string) => value.toUpperCase(),
+]
+
+// Array of classes and/or instances and/or functions
+transform: [
+  (value: string) => value.trim(),
+  UppercasePipe,
+  new SuffixPipe(' [ADVANCED]'),
+]
 ```
 
 ### Advanced Methods

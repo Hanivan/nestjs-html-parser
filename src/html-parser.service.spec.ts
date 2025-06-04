@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { HTML_PARSER_LOGGER_LEVEL } from './html-parser.config';
 import { HtmlParserService } from './html-parser.service';
 import { ExtractionSchema } from './types';
 
@@ -8,7 +9,13 @@ describe('HtmlParserService', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [HtmlParserService],
+      providers: [
+        HtmlParserService,
+        {
+          provide: HTML_PARSER_LOGGER_LEVEL,
+          useValue: 'log', // Default logger level
+        },
+      ],
     }).compile();
 
     service = module.get<HtmlParserService>(HtmlParserService);
@@ -866,6 +873,130 @@ describe('HtmlParserService', () => {
       }
     });
   });
+
+  describe('transform, multiple, and raw options', () => {
+    const simpleHtml = `
+      <div>
+        <h1 class="title">  Hello World  </h1>
+        <div class="epz">Episode 42</div>
+        <ul>
+          <li class="item">One</li>
+          <li class="item">Two</li>
+          <li class="item">Three</li>
+        </ul>
+      </div>
+    `;
+
+    class UppercasePipe {
+      execute(value: string) {
+        return value.toUpperCase();
+      }
+    }
+    class SuffixPipe {
+      constructor(private suffix: string) {}
+      execute(value: string) {
+        return value + this.suffix;
+      }
+    }
+
+    it('should support transform as a single function', () => {
+      const schema = {
+        title: {
+          selector: '//h1[@class="title"]/text()',
+          type: 'xpath' as const,
+          transform: (v: string) => v.trim().toUpperCase(),
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.title).toBe('HELLO WORLD');
+    });
+
+    it('should support transform as a single class (auto-instantiated)', () => {
+      const schema = {
+        title: {
+          selector: '//h1[@class="title"]/text()',
+          type: 'xpath' as const,
+          transform: UppercasePipe as any,
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.title).toBe('  HELLO WORLD  ');
+    });
+
+    it('should support transform as a single instance', () => {
+      const schema = {
+        title: {
+          selector: '//h1[@class="title"]/text()',
+          type: 'xpath' as const,
+          transform: new SuffixPipe('!'),
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.title).toBe('  Hello World  !');
+    });
+
+    it('should support transform as an array of function, class, and instance', () => {
+      const schema = {
+        title: {
+          selector: '//h1[@class="title"]/text()',
+          type: 'xpath' as const,
+          transform: [
+            (v: string) => v.trim(),
+            UppercasePipe as any,
+            new SuffixPipe('!'),
+          ] as any,
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.title).toBe('HELLO WORLD!');
+    });
+
+    it('should support the multiple option for arrays', () => {
+      const schema = {
+        items: {
+          selector: '//li[@class="item"]/text()',
+          type: 'xpath' as const,
+          multiple: true,
+          transform: (v: string) => v.toUpperCase(),
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.items).toEqual(['ONE', 'TWO', 'THREE']);
+    });
+
+    it('should support the raw option for raw HTML extraction', () => {
+      const schema = {
+        rawTitle: {
+          selector: '//h1[@class="title"]',
+          type: 'xpath' as const,
+          raw: true,
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.rawTitle).toContain('<h1 class="title">');
+      expect(result.rawTitle).toContain('Hello World');
+    });
+
+    it('should support transform for episode extraction (number)', () => {
+      const schema = {
+        episode: {
+          selector: '//div[@class="epz"]',
+          type: 'xpath' as const,
+          transform: [
+            (text: any) => {
+              if (typeof text !== 'string') return 0;
+              let match = text.match(/Episode\s+(\d+)/i);
+              if (!match) match = text.match(/(\d+)/);
+              return match ? parseInt(match[1]) : 0;
+            },
+            new SuffixPipe(' (ep)'),
+          ],
+        },
+      };
+      const result = service.extractStructured(simpleHtml, schema);
+      expect(result.episode).toBe('42 (ep)');
+    });
+  });
 });
 
 // TypeScript Generic Types Tests
@@ -943,7 +1074,13 @@ describe('HtmlParserService - Generic Types', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [HtmlParserService],
+      providers: [
+        HtmlParserService,
+        {
+          provide: HTML_PARSER_LOGGER_LEVEL,
+          useValue: 'log', // Default logger level
+        },
+      ],
     }).compile();
 
     service = module.get<HtmlParserService>(HtmlParserService);
