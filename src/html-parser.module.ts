@@ -32,7 +32,7 @@ import { HtmlParserService } from './html-parser.service';
  * import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
  *
  * @Module({
- *   imports: [HtmlParserModule],
+ *   imports: [HtmlParserModule], // Will use default configuration
  *   // ... other module configuration
  * })
  * export class AppModule {}
@@ -66,7 +66,16 @@ export interface HtmlParserConfigFactory {
   createHtmlParserConfig(): Promise<HtmlParserConfig> | HtmlParserConfig;
 }
 
-@Module({})
+@Module({
+  providers: [
+    HtmlParserService,
+    {
+      provide: HTML_PARSER_LOGGER_LEVEL,
+      useValue: 'log', // Default logger level
+    },
+  ],
+  exports: [HtmlParserService],
+})
 export class HtmlParserModule {
   static forRoot(config: HtmlParserConfig = {}): DynamicModule {
     const configProvider: Provider = {
