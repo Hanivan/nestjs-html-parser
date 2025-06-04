@@ -14,10 +14,9 @@ import { HtmlParserService } from './html-parser.service';
 /**
  * HTML Parser Module for NestJS
  *
- * A NestJS module that provides HTML parsing capabilities with XPath and CSS selector support.
- * This module exports the HtmlParserService which can be injected into other services or controllers.
+ * Provides HTML parsing capabilities with XPath and CSS selector support for NestJS applications.
  *
- * Features:
+ * **Features:**
  * - XPath and CSS selector extraction
  * - Proxy support with authentication
  * - Random user agent rotation
@@ -29,7 +28,8 @@ import { HtmlParserService } from './html-parser.service';
  * Always use `HtmlParserModule.forRoot()` or `HtmlParserModule.forRootAsync()` for proper configuration and future-proof usage.
  *
  * @example
- * // Recommended: Advanced usage with custom configuration
+ * Basic usage with custom configuration
+ * ```typescript
  * import { Module } from '@nestjs/common';
  * import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
  *
@@ -41,8 +41,15 @@ import { HtmlParserService } from './html-parser.service';
  *   ],
  * })
  * export class AppModule {}
+ * ```
  *
- * // Recommended: Async configuration using ConfigService
+ * @example
+ * Async configuration with environment variables
+ * ```typescript
+ * import { Module } from '@nestjs/common';
+ * import { ConfigModule, ConfigService } from '@nestjs/config';
+ * import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
+ *
  * @Module({
  *   imports: [
  *     ConfigModule.forRoot(),
@@ -56,8 +63,11 @@ import { HtmlParserService } from './html-parser.service';
  *   ],
  * })
  * export class AppModule {}
+ * ```
  *
- * // Use in a service
+ * @example
+ * Using the service in your application
+ * ```typescript
  * import { Injectable } from '@nestjs/common';
  * import { HtmlParserService } from '@hanivanrizky/nestjs-html-parser';
  *
@@ -71,17 +81,46 @@ import { HtmlParserService } from './html-parser.service';
  *     return { title, status: response.status };
  *   }
  * }
+ * ```
+ *
+ * @author Hanivan Rizky Sobari <hanivan20@gmail.com>
+ * @license MIT
  */
 
+/**
+ * Options for configuring HtmlParserModule asynchronously
+ */
 export interface HtmlParserModuleAsyncOptions
   extends Pick<ModuleMetadata, 'imports'> {
+  /**
+   * Use an existing provider that implements HtmlParserConfigFactory
+   */
   useExisting?: Type<HtmlParserConfigFactory>;
+
+  /**
+   * Create a new instance of a class that implements HtmlParserConfigFactory
+   */
   useClass?: Type<HtmlParserConfigFactory>;
+
+  /**
+   * Factory function that returns configuration
+   */
   useFactory?: (...args: any[]) => Promise<HtmlParserConfig> | HtmlParserConfig;
+
+  /**
+   * Dependencies to inject into the factory function
+   */
   inject?: any[];
 }
 
+/**
+ * Factory interface for creating HtmlParserConfig
+ */
 export interface HtmlParserConfigFactory {
+  /**
+   * Create configuration for the HTML Parser module
+   * @returns Configuration object or promise that resolves to configuration
+   */
   createHtmlParserConfig(): Promise<HtmlParserConfig> | HtmlParserConfig;
 }
 
@@ -111,6 +150,7 @@ export class HtmlParserModule {
    * @returns DynamicModule with configured providers
    *
    * @example
+   * Basic configuration
    * ```typescript
    * @Module({
    *   imports: [
@@ -120,6 +160,19 @@ export class HtmlParserModule {
    *   ],
    * })
    * export class AppModule {}
+   * ```
+   *
+   * @example
+   * Using different logger levels
+   * ```typescript
+   * // For production - minimal logging
+   * HtmlParserModule.forRoot({ loggerLevel: 'error' })
+   *
+   * // For development - detailed logging
+   * HtmlParserModule.forRoot({ loggerLevel: 'debug' })
+   *
+   * // For testing - verbose logging
+   * HtmlParserModule.forRoot({ loggerLevel: 'verbose' })
    * ```
    */
   static forRoot(config: HtmlParserConfig = {}): DynamicModule {
@@ -138,10 +191,13 @@ export class HtmlParserModule {
   /**
    * Configure the HTML Parser Module asynchronously
    *
+   * Useful when configuration depends on other modules or services that need to be initialized first.
+   *
    * @param options - Async configuration options
    * @returns DynamicModule with async configured providers
    *
    * @example
+   * Using with ConfigService
    * ```typescript
    * @Module({
    *   imports: [
@@ -152,6 +208,41 @@ export class HtmlParserModule {
    *         loggerLevel: configService.get('HTML_PARSER_LOGGER_LEVEL', 'warn')
    *       }),
    *       inject: [ConfigService],
+   *     }),
+   *   ],
+   * })
+   * export class AppModule {}
+   * ```
+   *
+   * @example
+   * Using with custom configuration factory
+   * ```typescript
+   * @Injectable()
+   * class HtmlParserConfigService implements HtmlParserConfigFactory {
+   *   createHtmlParserConfig(): HtmlParserConfig {
+   *     return {
+   *       loggerLevel: process.env.NODE_ENV === 'production' ? 'error' : 'debug'
+   *     };
+   *   }
+   * }
+   *
+   * @Module({
+   *   imports: [
+   *     HtmlParserModule.forRootAsync({
+   *       useClass: HtmlParserConfigService,
+   *     }),
+   *   ],
+   * })
+   * export class AppModule {}
+   * ```
+   *
+   * @example
+   * Using with existing provider
+   * ```typescript
+   * @Module({
+   *   imports: [
+   *     HtmlParserModule.forRootAsync({
+   *       useExisting: MyExistingConfigService,
    *     }),
    *   ],
    * })
@@ -190,11 +281,13 @@ export class HtmlParserModule {
         },
       ];
     }
+
     // useClass or useExisting
     const inject = [
       (options.useExisting ||
         options.useClass) as Type<HtmlParserConfigFactory>,
     ];
+
     return [
       {
         provide: HTML_PARSER_LOGGER_LEVEL,
