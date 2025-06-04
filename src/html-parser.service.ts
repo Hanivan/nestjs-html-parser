@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, LogLevel } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -48,7 +48,7 @@ import {
 @Injectable()
 export class HtmlParserService {
   private readonly logger: Logger;
-  private readonly loggerLevel: string | string[];
+  private readonly loggerLevel: LogLevel | Array<LogLevel>;
 
   /**
    * Default configuration options for HTML parsing operations
@@ -76,7 +76,7 @@ export class HtmlParserService {
    */
   constructor(
     @Inject(HTML_PARSER_LOGGER_LEVEL)
-    loggerLevel: string | string[] = ['log', 'error'],
+    loggerLevel: LogLevel | Array<LogLevel> = ['log', 'error', 'debug'],
   ) {
     this.logger = new Logger(HtmlParserService.name, { timestamp: true });
     this.loggerLevel = loggerLevel;
@@ -84,12 +84,65 @@ export class HtmlParserService {
 
   /**
    * Helper to check if a log level should be logged
+   * Fixed to properly handle both single and array logger configurations
    */
   private shouldLog(level: string): boolean {
+    // Define the logging level hierarchy
+    const levelHierarchy: LogLevel[] = [
+      'error',
+      'warn',
+      'log',
+      'debug',
+      'verbose',
+    ];
+
+    // Normalize the input level to LogLevel type
+    const targetLevel = level as LogLevel;
+
     if (Array.isArray(this.loggerLevel)) {
-      return this.loggerLevel.includes(level);
+      // If loggerLevel is an array, check if the target level is included
+      return this.loggerLevel.includes(targetLevel);
+    } else {
+      // If loggerLevel is a single level, use hierarchy
+      const currentIndex = levelHierarchy.indexOf(this.loggerLevel);
+      const targetIndex = levelHierarchy.indexOf(targetLevel);
+
+      // Return true if target level has higher or equal priority
+      return (
+        currentIndex !== -1 && targetIndex !== -1 && targetIndex <= currentIndex
+      );
     }
-    return this.loggerLevel === level;
+  }
+
+  /**
+   * Helper method to log with proper level checking
+   */
+  private logWithLevel(
+    level: LogLevel,
+    message: string,
+    ...optionalParams: any[]
+  ): void {
+    if (this.shouldLog(level)) {
+      switch (level) {
+        case 'error':
+          this.logger.error(message, ...optionalParams);
+          break;
+        case 'warn':
+          this.logger.warn(message, ...optionalParams);
+          break;
+        case 'log':
+          this.logger.log(message, ...optionalParams);
+          break;
+        case 'debug':
+          this.logger.debug(message, ...optionalParams);
+          break;
+        case 'verbose':
+          this.logger.verbose(message, ...optionalParams);
+          break;
+        default:
+          this.logger.log(message, ...optionalParams);
+      }
+    }
   }
 
   /**
@@ -173,9 +226,9 @@ export class HtmlParserService {
     const retryDelay =
       config.retryDelay ?? this.defaultOptions.retryDelay ?? 1000;
 
-    if (config.verbose && this.shouldLog('debug')) {
-      this.logger.debug(`🌐 Fetching URL: ${url}`);
-      this.logger.debug(`🔧 Configuration:`, {
+    if (config.verbose) {
+      this.logWithLevel('debug', `🌐 Fetching URL: ${url}`);
+      this.logWithLevel('debug', `🔧 Configuration:`, {
         timeout: config.timeout,
         retries: maxRetries,
         rejectUnauthorized: config.rejectUnauthorized,
@@ -186,8 +239,11 @@ export class HtmlParserService {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        if (config.verbose && attempt > 0 && this.shouldLog('debug')) {
-          this.logger.debug(`🔄 Retry attempt ${attempt}/${maxRetries}`);
+        if (config.verbose && attempt > 0) {
+          this.logWithLevel(
+            'debug',
+            `🔄 Retry attempt ${attempt}/${maxRetries}`,
+          );
         }
 
         // Get user agent - either random or specified
@@ -220,8 +276,9 @@ export class HtmlParserService {
 
         const response = await axios.get(url, axiosConfig);
 
-        if (config.verbose && this.shouldLog('debug')) {
-          this.logger.debug(
+        if (config.verbose) {
+          this.logWithLevel(
+            'debug',
             `✅ Successfully fetched ${url} (${response.status} ${response.statusText})`,
           );
         }
@@ -236,8 +293,9 @@ export class HtmlParserService {
         lastError = error instanceof Error ? error : new Error(String(error));
         const errorInfo = this.categorizeError(lastError);
 
-        if (config.verbose && this.shouldLog('error')) {
-          this.logger.error(
+        if (this.shouldLog('error')) {
+          this.logWithLevel(
+            'error',
             `❌ Attempt ${attempt + 1} failed: ${errorInfo.type} - ${lastError.message}`,
           );
         }
@@ -245,16 +303,20 @@ export class HtmlParserService {
         // Check if we should retry based on error type
         const shouldRetry = this.shouldRetryOnError(errorInfo, config);
 
-        if (config.verbose && this.shouldLog('debug')) {
-          this.logger.debug(
+        if (config.verbose) {
+          this.logWithLevel(
+            'debug',
             `🤔 Should retry: ${shouldRetry}, Attempts left: ${maxRetries - attempt}`,
           );
         }
 
         // If this is not the last attempt and we should retry this error type
         if (attempt < maxRetries && shouldRetry) {
-          if (config.verbose && this.shouldLog('debug')) {
-            this.logger.debug(`⏳ Waiting ${retryDelay}ms before retry...`);
+          if (config.verbose) {
+            this.logWithLevel(
+              'debug',
+              `⏳ Waiting ${retryDelay}ms before retry...`,
+            );
           }
           await this.delay(retryDelay);
           continue;
@@ -262,8 +324,11 @@ export class HtmlParserService {
 
         // If we shouldn't retry this error type, break early
         if (!shouldRetry) {
-          if (config.verbose && this.shouldLog('debug')) {
-            this.logger.debug(`🚫 Not retrying ${errorInfo.type} error`);
+          if (config.verbose) {
+            this.logWithLevel(
+              'debug',
+              `🚫 Not retrying ${errorInfo.type} error`,
+            );
           }
           break;
         }
@@ -498,8 +563,9 @@ export class HtmlParserService {
   ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
-    if (verbose && this.shouldLog('debug')) {
-      this.logger.debug(
+    if (verbose) {
+      this.logWithLevel(
+        'debug',
         `🔍 extractSingle - Selector: "${selector}", Type: ${type}, Attribute: ${attribute || 'none'}`,
       );
     }
@@ -513,8 +579,9 @@ export class HtmlParserService {
         result = this.extractSingleCSS(html, selector, attribute);
       }
 
-      if (verbose && this.shouldLog('debug')) {
-        this.logger.debug(
+      if (verbose) {
+        this.logWithLevel(
+          'debug',
           `✅ extractSingle result: ${result ? `"${result.substring(0, 100)}${result.length > 100 ? '...' : ''}"` : 'null'}`,
         );
       }
@@ -527,8 +594,8 @@ export class HtmlParserService {
       // Return as T if no transform (assumes T extends string when no transform)
       return result as T | null;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('❌ Error in extractSingle:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in extractSingle:', error);
       }
       return null;
     }
@@ -591,8 +658,9 @@ export class HtmlParserService {
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
-    if (verbose && this.shouldLog('debug')) {
-      this.logger.debug(
+    if (verbose) {
+      this.logWithLevel(
+        'debug',
         `🔍 extractMultiple - Selector: "${selector}", Type: ${type}, Attribute: ${attribute || 'none'}`,
       );
     }
@@ -606,22 +674,27 @@ export class HtmlParserService {
         results = this.extractMultipleCSS(html, selector, attribute);
       }
 
-      if (verbose && this.shouldLog('debug')) {
-        this.logger.debug(`✅ extractMultiple found ${results.length} results`);
+      if (verbose) {
+        this.logWithLevel(
+          'debug',
+          `✅ extractMultiple found ${results.length} results`,
+        );
         if (results.length > 0 && results.length <= 5) {
           results.forEach((result, index) => {
-            this.logger.debug(
+            this.logWithLevel(
+              'debug',
               `   ${index + 1}: "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
             );
           });
         } else if (results.length > 5) {
-          this.logger.debug(`   First 3 results:`);
+          this.logWithLevel('debug', `   First 3 results:`);
           results.slice(0, 3).forEach((result, index) => {
-            this.logger.debug(
+            this.logWithLevel(
+              'debug',
               `   ${index + 1}: "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
             );
           });
-          this.logger.debug(`   ... and ${results.length - 3} more`);
+          this.logWithLevel('debug', `   ... and ${results.length - 3} more`);
         }
       }
 
@@ -633,8 +706,8 @@ export class HtmlParserService {
       // Return as T[] if no transform (assumes T extends string when no transform)
       return results as T[];
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('❌ Error in extractMultiple:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in extractMultiple:', error);
       }
       return [];
     }
@@ -702,8 +775,8 @@ export class HtmlParserService {
       // Return as T if no transform (assumes T extends string when no transform)
       return result as T | null;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('Error in extractText:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'Error in extractText:', error);
       }
       return null;
     }
@@ -780,8 +853,8 @@ export class HtmlParserService {
       // Return as T[] if no transform (assumes T extends string when no transform)
       return results as T[];
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('Error in extractAttributes:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'Error in extractAttributes:', error);
       }
       return [];
     }
@@ -837,7 +910,8 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose && this.shouldLog('debug')) {
-      this.logger.debug(
+      this.logWithLevel(
+        'debug',
         `🔍 exists - Checking selector: "${selector}", Type: ${type}`,
       );
     }
@@ -854,15 +928,16 @@ export class HtmlParserService {
       }
 
       if (verbose && this.shouldLog('debug')) {
-        this.logger.debug(
+        this.logWithLevel(
+          'debug',
           `✅ exists result: ${result ? 'Found' : 'Not found'}`,
         );
       }
 
       return result;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('❌ Error in exists:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in exists:', error);
       }
       return false;
     }
@@ -922,7 +997,8 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
     if (verbose && this.shouldLog('debug')) {
-      this.logger.debug(
+      this.logWithLevel(
+        'debug',
         `🔍 count - Counting selector: "${selector}", Type: ${type}`,
       );
     }
@@ -939,13 +1015,13 @@ export class HtmlParserService {
       }
 
       if (verbose && this.shouldLog('debug')) {
-        this.logger.debug(`✅ count result: ${result} elements found`);
+        this.logWithLevel('debug', `✅ count result: ${result} elements found`);
       }
 
       return result;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('❌ Error in count:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in count:', error);
       }
       return 0;
     }
@@ -1049,6 +1125,13 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const result: Record<string, any> = {};
 
+    if (verbose) {
+      this.logWithLevel(
+        'debug',
+        `🔍 extractStructured - Processing ${Object.keys(schema).length} schema fields`,
+      );
+    }
+
     try {
       for (const [key, config] of Object.entries(schema)) {
         try {
@@ -1119,16 +1202,27 @@ export class HtmlParserService {
           }
 
           result[key] = value;
+
+          if (verbose) {
+            this.logWithLevel(
+              'debug',
+              `✅ Extracted field '${key}': ${value ? 'success' : 'null/empty'}`,
+            );
+          }
         } catch (error) {
-          if (verbose && this.shouldLog('error')) {
-            this.logger.error(`Error extracting field '${key}':`, error);
+          if (this.shouldLog('error')) {
+            this.logWithLevel(
+              'error',
+              `❌ Error extracting field '${key}':`,
+              error,
+            );
           }
           result[key] = config.multiple ? [] : null;
         }
       }
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('Error in extractStructured:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in extractStructured:', error);
       }
     }
 
@@ -1222,11 +1316,15 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const results: T[] = [];
 
-    if (verbose && this.shouldLog('debug')) {
-      this.logger.debug(
+    if (verbose) {
+      this.logWithLevel(
+        'debug',
         `🔍 extractStructuredList - Container: "${containerSelector}", Type: ${containerType}`,
       );
-      this.logger.debug(`📋 Schema fields: ${Object.keys(schema).join(', ')}`);
+      this.logWithLevel(
+        'debug',
+        `📋 Schema fields: ${Object.keys(schema).join(', ')}`,
+      );
     }
 
     try {
@@ -1239,8 +1337,9 @@ export class HtmlParserService {
         containers = $(containerSelector).toArray();
       }
 
-      if (verbose && this.shouldLog('debug')) {
-        this.logger.debug(
+      if (verbose) {
+        this.logWithLevel(
+          'debug',
           `📦 Found ${containers.length} containers to process`,
         );
       }
@@ -1248,9 +1347,10 @@ export class HtmlParserService {
       for (let i = 0; i < containers.length; i++) {
         const container = containers[i];
 
-        if (verbose && this.shouldLog('debug')) {
-          this.logger.debug(
-            `\n📦 Processing container ${i + 1}/${containers.length}`,
+        if (verbose) {
+          this.logWithLevel(
+            'debug',
+            `📦 Processing container ${i + 1}/${containers.length}`,
           );
         }
 
@@ -1260,27 +1360,29 @@ export class HtmlParserService {
         });
         results.push(item);
 
-        if (verbose && this.shouldLog('debug')) {
+        if (verbose) {
           const extractedFields = Object.entries(item as Record<string, any>)
             .filter(
               ([_, value]) =>
                 value !== null && value !== undefined && value !== '',
             )
             .map(([key, _]) => key);
-          this.logger.debug(
+          this.logWithLevel(
+            'debug',
             `✅ Container ${i + 1} extracted fields: ${extractedFields.join(', ')}`,
           );
         }
       }
 
-      if (verbose && this.shouldLog('debug')) {
-        this.logger.debug(
-          `\n🎯 extractStructuredList completed: ${results.length} items extracted`,
+      if (verbose) {
+        this.logWithLevel(
+          'debug',
+          `🎯 extractStructuredList completed: ${results.length} items extracted`,
         );
       }
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('❌ Error in extractStructuredList:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in extractStructuredList:', error);
       }
     }
 
@@ -1317,7 +1419,7 @@ export class HtmlParserService {
 
           // Only log non-CSS errors in verbose mode
           if (!isCSSError) {
-            this.logger.error('XPath evaluation error:', error);
+            this.logWithLevel('error', 'XPath evaluation error:', error);
           }
         });
 
@@ -1329,17 +1431,17 @@ export class HtmlParserService {
             warningString.includes('stylesheet');
 
           if (!isCSSWarning) {
-            this.logger.warn('XPath evaluation warning:', warning);
+            this.logWithLevel('warn', 'XPath evaluation warning:', warning);
           }
         });
 
         // Allow info and log messages in verbose mode
         virtualConsole.on('info', (...args) => {
-          if (verbose) this.logger.debug('XPath info:', ...args);
+          if (verbose) this.logWithLevel('debug', 'XPath info:', ...args);
         });
 
         virtualConsole.on('log', (...args) => {
-          if (verbose) this.logger.debug('XPath log:', ...args);
+          if (verbose) this.logWithLevel('debug', 'XPath log:', ...args);
         });
       }
 
@@ -1367,17 +1469,21 @@ export class HtmlParserService {
       }
 
       if (verbose && nodes.length === 0) {
-        this.logger.debug(`XPath query "${xpath}" returned no results`);
+        this.logWithLevel(
+          'debug',
+          `XPath query "${xpath}" returned no results`,
+        );
       } else if (verbose) {
-        this.logger.debug(
+        this.logWithLevel(
+          'debug',
           `XPath query "${xpath}" returned ${nodes.length} results`,
         );
       }
 
       return nodes;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('XPath evaluation error:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'XPath evaluation error:', error);
       }
       return [];
     }
@@ -1458,8 +1564,8 @@ export class HtmlParserService {
 
       return null;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('Error in extractSingleXPath:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'Error in extractSingleXPath:', error);
       }
       return null;
     }
@@ -1544,8 +1650,8 @@ export class HtmlParserService {
 
       return results;
     } catch (error) {
-      if (verbose && this.shouldLog('error')) {
-        this.logger.error('Error in extractMultipleXPath:', error);
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'Error in extractMultipleXPath:', error);
       }
       return [];
     }
