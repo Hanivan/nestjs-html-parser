@@ -954,15 +954,19 @@ export class HtmlParserService {
    *
    * Applies a schema object to extract multiple related fields from HTML content.
    * Each field in the schema defines its own selector, type, optional attribute,
-   * and transformation function. Useful for extracting complex data structures
-   * like product information, article metadata, or user profiles.
+   * transformation function, and now supports a 'multiple' flag for array extraction.
+   *
+   * If a schema field includes `multiple: true`, the extracted value for that field
+   * will be an array of results (with transform applied to each item if provided).
+   * Otherwise, a single value is returned as before.
    *
    * @param html - HTML content to parse
-   * @param schema - Schema object defining fields to extract
+   * @param schema - Schema object defining fields to extract (see ExtractionSchema)
    * @param options - Parsing options
    * @param options.verbose - Enable verbose logging for debugging
    *
-   * @returns Object with extracted data matching the schema structure
+   * @returns Object with extracted data matching the schema structure. Fields with
+   *          `multiple: true` will be arrays, others will be single values.
    *
    * @example
    * ```typescript
@@ -972,6 +976,10 @@ export class HtmlParserService {
    *     <span class="price">$29.99</span>
    *     <img src="/image.jpg" alt="Product">
    *     <div class="rating" data-stars="4">★★★★☆</div>
+   *     <div class="tags">
+   *       <span class="tag">electronics</span>
+   *       <span class="tag">gadget</span>
+   *     </div>
    *   </article>
    * `;
    *
@@ -981,6 +989,7 @@ export class HtmlParserService {
    *   price: number;
    *   image: string;
    *   rating: number;
+   *   tags: string[]; // <-- array field
    * }
    *
    * const productSchema: ExtractionSchema<Product> = {
@@ -1003,6 +1012,11 @@ export class HtmlParserService {
    *     type: 'xpath',
    *     attribute: 'data-stars',
    *     transform: (stars) => parseInt(stars)
+   *   },
+   *   tags: {
+   *     selector: '//span[@class="tag"]/text()',
+   *     type: 'xpath',
+   *     multiple: true // <-- NEW: array extraction
    *   }
    * };
    *
@@ -1012,7 +1026,8 @@ export class HtmlParserService {
    * //   title: "Product Name",
    * //   price: 29.99,
    * //   image: "/image.jpg",
-   * //   rating: 4
+   * //   rating: 4,
+   * //   tags: ["electronics", "gadget"] // <-- array result
    * // }
    * ```
    */
@@ -1029,24 +1044,46 @@ export class HtmlParserService {
         try {
           let value: any;
 
-          if (config.type === 'xpath') {
-            value = this.extractSingleXPath(
-              html,
-              config.selector,
-              config.attribute,
-              verbose,
-            );
+          if (config.multiple) {
+            // Use extractMultiple for array fields
+            if (config.type === 'xpath') {
+              value = this.extractMultipleXPath(
+                html,
+                config.selector,
+                config.attribute,
+                verbose,
+              );
+            } else {
+              value = this.extractMultipleCSS(
+                html,
+                config.selector,
+                config.attribute,
+              );
+            }
+            // Apply transformation if provided
+            if (config.transform) {
+              value = value.map(config.transform);
+            }
           } else {
-            value = this.extractSingleCSS(
-              html,
-              config.selector,
-              config.attribute,
-            );
-          }
-
-          // Apply transformation if provided
-          if (value && config.transform) {
-            value = config.transform(value);
+            // Use extractSingle for single value fields
+            if (config.type === 'xpath') {
+              value = this.extractSingleXPath(
+                html,
+                config.selector,
+                config.attribute,
+                verbose,
+              );
+            } else {
+              value = this.extractSingleCSS(
+                html,
+                config.selector,
+                config.attribute,
+              );
+            }
+            // Apply transformation if provided
+            if (value && config.transform) {
+              value = config.transform(value);
+            }
           }
 
           result[key] = value;
@@ -1054,7 +1091,7 @@ export class HtmlParserService {
           if (verbose) {
             this.logger.error(`Error extracting field '${key}':`, error);
           }
-          result[key] = null;
+          result[key] = config.multiple ? [] : null;
         }
       }
     } catch (error) {
@@ -1069,10 +1106,8 @@ export class HtmlParserService {
   /**
    * Extract array of structured data from repeating HTML elements
    *
-   * Finds multiple container elements and applies a schema to each one,
-   * returning an array of extracted objects. Perfect for processing
-   * lists of items like articles, products, comments, or search results.
-   * Each container is processed independently with the same schema.
+   * For each container, applies the schema as in extractStructured. If a schema field
+   * includes `multiple: true`, the extracted value for that field will be an array of results.
    *
    * @param html - HTML content to parse
    * @param containerSelector - XPath or CSS selector to find container elements
@@ -1081,7 +1116,8 @@ export class HtmlParserService {
    * @param options - Parsing options
    * @param options.verbose - Enable verbose logging for debugging
    *
-   * @returns Array of objects with extracted data matching the schema structure
+   * @returns Array of objects with extracted data matching the schema structure. Fields with
+   *          `multiple: true` will be arrays, others will be single values.
    *
    * @example
    * ```typescript
@@ -1090,12 +1126,13 @@ export class HtmlParserService {
    *     <div class="product">
    *       <h3>Product A</h3>
    *       <span class="price">$19.99</span>
-   *       <img src="/a.jpg" alt="Product A">
+   *       <span class="tag">electronics</span>
+   *       <span class="tag">gadget</span>
    *     </div>
    *     <div class="product">
    *       <h3>Product B</h3>
    *       <span class="price">$29.99</span>
-   *       <img src="/b.jpg" alt="Product B">
+   *       <span class="tag">accessory</span>
    *     </div>
    *   </div>
    * `;
@@ -1104,7 +1141,7 @@ export class HtmlParserService {
    * interface Product {
    *   name: string;
    *   price: number;
-   *   image: string;
+   *   tags: string[]; // <-- array field
    * }
    *
    * const productSchema: ExtractionSchema<Product> = {
@@ -1115,12 +1152,12 @@ export class HtmlParserService {
    *   price: {
    *     selector: './/span[@class="price"]/text()',
    *     type: 'xpath',
-   *     transform: (price) => parseFloat(price.replace('$', ''))
+   *     transform: (value) => parseFloat(value.replace('$', ''))
    *   },
-   *   image: {
-   *     selector: './/img',
+   *   tags: {
+   *     selector: './/span[@class="tag"]/text()',
    *     type: 'xpath',
-   *     attribute: 'src'
+   *     multiple: true // <-- NEW: array extraction
    *   }
    * };
    *
@@ -1129,20 +1166,11 @@ export class HtmlParserService {
    *   '//div[@class="product"]',
    *   productSchema
    * );
-   *
-   * // Result: Product[] with full type safety
+   * // Result: Product[] with tags as array for each product
    * // [
-   * //   { name: "Product A", price: 19.99, image: "/a.jpg" },
-   * //   { name: "Product B", price: 29.99, image: "/b.jpg" }
+   * //   { name: "Product A", price: 19.99, tags: ["electronics", "gadget"] },
+   * //   { name: "Product B", price: 29.99, tags: ["accessory"] }
    * // ]
-   *
-   * // Using CSS selector for containers
-   * const productsCSS = parser.extractStructuredList<Product>(
-   *   html,
-   *   '.product',
-   *   productSchema,
-   *   'css'
-   * );
    * ```
    */
   extractStructuredList<T = Record<string, any>>(

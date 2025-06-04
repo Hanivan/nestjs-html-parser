@@ -167,6 +167,24 @@ async function demonstrateHackerNewsParser() {
     console.log(
       'see examples/watanoc.com.ts which demonstrates parsing https://watanoc.com/',
     );
+
+    // === Navigation Bar Extraction with multiple: true ===
+    console.log('\n=== Navigation Bar Extraction (multiple: true) ===');
+    const navSchema: ExtractionSchema = {
+      navLinks: {
+        selector: '//span[@class="pagetop"]/a/@href',
+        type: 'xpath',
+        multiple: true,
+      },
+      navTexts: {
+        selector: '//span[@class="pagetop"]/a/text()',
+        type: 'xpath',
+        multiple: true,
+      },
+    };
+    const navResult = parser.extractStructured(html, navSchema);
+    console.log('Navigation links:', navResult.navLinks);
+    console.log('Navigation texts:', navResult.navTexts);
   } catch (error) {
     console.error('Error demonstrating Hacker News parser:', error.message);
   }

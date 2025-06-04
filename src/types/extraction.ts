@@ -16,6 +16,10 @@ export interface ExtractionSchema<T = Record<string, any>> {
      * Function to transform the extracted value
      */
     transform?: (value: string) => any;
+    /**
+     * If true, extract an array of values instead of a single value
+     */
+    multiple?: boolean;
   };
 }
 
@@ -36,4 +40,8 @@ export interface ExtractionField<T = any> {
    * Function to transform the extracted value
    */
   transform?: (value: string) => T;
+  /**
+   * If true, extract an array of values instead of a single value
+   */
+  multiple?: boolean;
 }

@@ -169,7 +169,8 @@ const schema = {
     type: 'css', 
     attribute: 'datetime',
     transform: (value: string) => new Date(value)
-  }
+  },
+  links: { selector: '//a/@href', type: 'xpath', multiple: true }
 };
 const data = htmlParser.extractStructured(html, schema);
 ```
@@ -340,7 +341,7 @@ console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
 
 #### `extractStructured<T = Record<string, any>>(html: string, schema: ExtractionSchema<T>, options?: { verbose?: boolean }): T`
 
-Extract data using a typed schema object.
+Extract data using a typed schema object. Supports `multiple: true` for array extraction in any field.
 
 ```typescript
 import { ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
@@ -349,8 +350,7 @@ import { ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
 interface Article {
   title: string;
   author: string;
-  wordCount: number;
-  publishDate: Date;
+  links: string[];
 }
 
 // Create typed schema
@@ -364,35 +364,27 @@ const schema: ExtractionSchema<Article> = {
     type: 'xpath',
     attribute: 'content'
   },
-  wordCount: {
-    selector: '//article',
-    type: 'css',
-    transform: (text: string) => text.split(' ').length
-  },
-  publishDate: {
-    selector: '//time',
+  links: {
+    selector: '//a/@href',
     type: 'xpath',
-    attribute: 'datetime',
-    transform: (value: string) => new Date(value)
+    multiple: true
   }
 };
 
 const result = htmlParser.extractStructured<Article>(html, schema);
-// Result: Article type with full type safety
-// { title: "Page Title", author: "John Doe", wordCount: 150, publishDate: Date }
+// Result: { title: "Page Title", author: "John Doe", links: ["/home", "/about", ...] }
 ```
 
 #### `extractStructuredList<T = Record<string, any>>(html: string, containerSelector: string, schema: ExtractionSchema<T>, containerType?: 'xpath' | 'css', options?: { verbose?: boolean }): T[]`
 
-Extract arrays of typed structured data.
+Extract arrays of typed structured data. Supports `multiple: true` for array extraction in any field.
 
 ```typescript
 // Define typed interface
 interface Product {
   name: string;
   price: number;
-  rating: number;
-  inStock: boolean;
+  tags: string[];
 }
 
 // Create typed schema
@@ -406,16 +398,10 @@ const productSchema: ExtractionSchema<Product> = {
     type: 'xpath',
     transform: (value: string) => parseFloat(value.replace('$', ''))
   },
-  rating: {
-    selector: './/div[@data-rating]',
+  tags: {
+    selector: './/span[@class="tag"]/text()',
     type: 'xpath',
-    attribute: 'data-rating',
-    transform: (value: string) => parseFloat(value)
-  },
-  inStock: {
-    selector: './/span[@class="stock"]',
-    type: 'xpath',
-    transform: (value: string) => value.toLowerCase() === 'in stock'
+    multiple: true
   }
 };
 
@@ -424,7 +410,7 @@ const products = htmlParser.extractStructuredList<Product>(
   '//div[@class="product"]',
   productSchema
 );
-// Result: Product[] with full type safety
+// Result: Product[] with tags as array for each product
 ```
 
 ## Development
