@@ -35,8 +35,7 @@
  * }
  * ```
  *
- * @author Hanivan Rizky Sobari
- * @version 0.2.0
+ * @author Hanivan Rizky Sobari <hanivan20@gmail.com>
  * @license MIT
  */
 
