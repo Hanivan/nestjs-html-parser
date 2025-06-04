@@ -1,6 +1,5 @@
 # Source files (we only want compiled dist files)
 src/
-!src/examples/
 *.ts
 !*.d.ts
 
