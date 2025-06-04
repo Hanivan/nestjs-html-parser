@@ -162,13 +162,13 @@ const urls = htmlParser.extractAttributes(html, '//a', 'href');
 
 // Structured data extraction with advanced transform
 class UppercasePipe {
-  execute(value: string) {
+  transform(value: string) {
     return value.toUpperCase();
   }
 }
 class SuffixPipe {
   constructor(private suffix: string) {}
-  execute(value: string) {
+  transform(value: string) {
     return value + this.suffix;
   }
 }
