@@ -70,7 +70,11 @@ import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
 
 @Module({
   imports: [
-    HtmlParserModule.forRoot({ loggerLevel: 'debug' }), // Set logger level: 'debug', 'log', 'warn', 'error', or 'verbose'
+    HtmlParserModule.forRoot(), // Default: loggerLevel: ['log', 'error'] (production ready)
+    // Or override for development:
+    HtmlParserModule.forRoot({ loggerLevel: 'debug' }),
+    // Or enable multiple levels:
+    HtmlParserModule.forRoot({ loggerLevel: ['debug', 'warn'] }),
   ],
 })
 export class AppModule {}
@@ -89,7 +93,7 @@ import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
     HtmlParserModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        loggerLevel: configService.get<'debug'|'log'|'warn'|'error'|'verbose'>('HTML_PARSER_LOGGER_LEVEL', 'warn'),
+        loggerLevel: configService.get<'debug'|'log'|'warn'|'error'|'verbose'|('debug'|'log'|'warn'|'error'|'verbose')[]>('HTML_PARSER_LOGGER_LEVEL', 'warn'),
       }),
       inject: [ConfigService],
     }),
