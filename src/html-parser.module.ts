@@ -27,13 +27,38 @@ import { HtmlParserService } from './html-parser.service';
  *
  * @example
  * ```typescript
- * // Import in your app module
+ * // Basic usage with default configuration
  * import { Module } from '@nestjs/common';
  * import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
  *
  * @Module({
- *   imports: [HtmlParserModule], // Will use default configuration
+ *   imports: [HtmlParserModule], // Uses default configuration (loggerLevel: 'log')
  *   // ... other module configuration
+ * })
+ * export class AppModule {}
+ *
+ * // Advanced usage with custom configuration
+ * @Module({
+ *   imports: [
+ *     HtmlParserModule.forRoot({
+ *       loggerLevel: 'debug'
+ *     })
+ *   ],
+ * })
+ * export class AppModule {}
+ *
+ * // Async configuration using ConfigService
+ * @Module({
+ *   imports: [
+ *     ConfigModule.forRoot(),
+ *     HtmlParserModule.forRootAsync({
+ *       imports: [ConfigModule],
+ *       useFactory: (configService: ConfigService) => ({
+ *         loggerLevel: configService.get('HTML_PARSER_LOGGER_LEVEL', 'warn')
+ *       }),
+ *       inject: [ConfigService],
+ *     }),
+ *   ],
  * })
  * export class AppModule {}
  *
@@ -66,6 +91,14 @@ export interface HtmlParserConfigFactory {
   createHtmlParserConfig(): Promise<HtmlParserConfig> | HtmlParserConfig;
 }
 
+/**
+ * HTML Parser Module with default configuration
+ *
+ * When imported directly, provides HtmlParserService with default settings:
+ * - loggerLevel: 'log'
+ *
+ * For custom configuration, use forRoot() or forRootAsync()
+ */
 @Module({
   providers: [
     HtmlParserService,
@@ -77,6 +110,24 @@ export interface HtmlParserConfigFactory {
   exports: [HtmlParserService],
 })
 export class HtmlParserModule {
+  /**
+   * Configure the HTML Parser Module with custom options
+   *
+   * @param config - Configuration options for the HTML Parser
+   * @returns DynamicModule with configured providers
+   *
+   * @example
+   * ```typescript
+   * @Module({
+   *   imports: [
+   *     HtmlParserModule.forRoot({
+   *       loggerLevel: 'debug'
+   *     })
+   *   ],
+   * })
+   * export class AppModule {}
+   * ```
+   */
   static forRoot(config: HtmlParserConfig = {}): DynamicModule {
     const configProvider: Provider = {
       provide: HTML_PARSER_LOGGER_LEVEL,
@@ -90,6 +141,29 @@ export class HtmlParserModule {
     };
   }
 
+  /**
+   * Configure the HTML Parser Module asynchronously
+   *
+   * @param options - Async configuration options
+   * @returns DynamicModule with async configured providers
+   *
+   * @example
+   * ```typescript
+   * @Module({
+   *   imports: [
+   *     ConfigModule.forRoot(),
+   *     HtmlParserModule.forRootAsync({
+   *       imports: [ConfigModule],
+   *       useFactory: (configService: ConfigService) => ({
+   *         loggerLevel: configService.get('HTML_PARSER_LOGGER_LEVEL', 'warn')
+   *       }),
+   *       inject: [ConfigService],
+   *     }),
+   *   ],
+   * })
+   * export class AppModule {}
+   * ```
+   */
   static forRootAsync(options: HtmlParserModuleAsyncOptions): DynamicModule {
     const asyncProviders = this.createAsyncProviders(options);
     return {
@@ -100,6 +174,13 @@ export class HtmlParserModule {
     };
   }
 
+  /**
+   * Create async providers for the module configuration
+   *
+   * @param options - Async configuration options
+   * @returns Array of providers for async configuration
+   * @private
+   */
   private static createAsyncProviders(
     options: HtmlParserModuleAsyncOptions,
   ): Provider[] {
