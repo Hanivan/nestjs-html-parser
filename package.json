@@ -1,6 +1,6 @@
 {
   "name": "@hanivanrizky/nestjs-html-parser",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A powerful NestJS HTML parsing service with XPath and CSS selector support, proxy configuration, random user agents, and rich response metadata including headers and status codes",
   "author": "Hanivan Rizky Sobari <hanivan20@gmail.com>",
   "private": false,
