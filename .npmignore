@@ -1,5 +1,6 @@
 # Source files (we only want compiled dist files)
 src/
+!src/examples/
 *.ts
 !*.d.ts
 
@@ -28,9 +29,6 @@ coverage/
 *.test.ts
 *.test.js
 
-# Examples (keep in source but not in npm package)
-src/examples/
-
 # Development tools
 .vscode/
 .idea/
@@ -41,4 +39,4 @@ Thumbs.db
 # Environment files
 .env
 .env.local
-.env.production 
+.env.production

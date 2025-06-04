@@ -9,7 +9,7 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist/**/*",
-    "!dist/examples",
+    "src/examples/**/*",
     "!dist/*.tsbuildinfo"
   ],
   "publishConfig": {
