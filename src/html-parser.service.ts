@@ -1759,6 +1759,18 @@ export class HtmlParserService {
   private applyTransform(value: any, transform: any): any {
     if (!transform) return value;
 
+    // Helper to get text content from DOM element
+    const toText = (val: any) => {
+      if (
+        typeof val !== 'string' &&
+        val &&
+        typeof val.textContent === 'string'
+      ) {
+        return val.textContent;
+      }
+      return val;
+    };
+
     const isClass = (t: any) => {
       return (
         typeof t === 'function' &&
@@ -1769,6 +1781,7 @@ export class HtmlParserService {
     };
 
     const executeTransform = (val: any, t: any): any => {
+      val = toText(val); // Always convert to string if possible before transform
       if (typeof t === 'function' && !isClass(t)) return t(val);
       if (isClass(t)) {
         const instance = new t();
