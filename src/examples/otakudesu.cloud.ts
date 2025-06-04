@@ -316,13 +316,13 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
     // === Advanced Transform Example ===
     // --- Example class definitions ---
     class UppercasePipe {
-      execute(value: string) {
+      transform(value: string) {
         return value.toUpperCase();
       }
     }
     class SuffixPipe {
       constructor(private suffix: string) {}
-      execute(value: string) {
+      transform(value: string) {
         return value + this.suffix;
       }
     }
@@ -336,7 +336,7 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
           (title: string) => title.trim(),
           UppercasePipe as any, // <-- class, will be instantiated automatically
           new SuffixPipe(' [ADVANCED]'), // <-- instance, used as is
-        ],
+        ] as any,
       },
       episode: {
         selector: './/div[@class="epz"]',
@@ -348,9 +348,8 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
             if (!match) match = text.match(/(\d+)/);
             return match ? parseInt(match[1]) : 0;
           },
-          // SuffixPipe as any, // <-- class, will be instantiated with no args (suffix will be undefined)
           new SuffixPipe(' (ep)'), // <-- instance, used as is
-        ],
+        ] as any,
       },
     };
     const advancedAnime = parser.extractStructuredList(

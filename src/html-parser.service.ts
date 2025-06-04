@@ -1754,31 +1754,30 @@ export class HtmlParserService {
   }
 
   /**
-   * Apply a transform (function, object with execute, class constructor, or array of these) to a value or array of values.
+   * Apply a transform (function, object with transform, class constructor, or array of these) to a value or array of values.
    */
   private applyTransform(value: any, transform: any): any {
     if (!transform) return value;
 
     const isClass = (t: any) => {
-      // Heuristic: class constructors have a prototype with a non-empty constructor
       return (
         typeof t === 'function' &&
         t.prototype &&
         t.prototype.constructor === t &&
-        Object.getOwnPropertyNames(t.prototype).includes('execute')
+        Object.getOwnPropertyNames(t.prototype).includes('transform')
       );
     };
 
     const executeTransform = (val: any, t: any): any => {
-      if (typeof t === 'function' && !isClass(t)) return t(val); // plain function
+      if (typeof t === 'function' && !isClass(t)) return t(val);
       if (isClass(t)) {
         const instance = new t();
-        if (typeof instance.execute === 'function')
-          return instance.execute(val);
+        if (typeof instance.transform === 'function')
+          return instance.transform(val);
         return val;
       }
-      if (t && typeof t === 'object' && typeof t.execute === 'function') {
-        return t.execute(val);
+      if (t && typeof t === 'object' && typeof t.transform === 'function') {
+        return t.transform(val);
       }
       return val;
     };

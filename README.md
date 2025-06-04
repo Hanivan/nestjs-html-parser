@@ -372,14 +372,25 @@ The `transform` property in a schema field is highly flexible. You can use:
 **Note:** The parser will always convert DOM elements to their text content before applying the transform, so your transform functions can safely expect a string.
 
 **Important:**
-If you use a class or object for `transform`, it **must** have a method named `execute(value)`. The parser will call this method with the extracted value.
+If you use a class or object for `transform`, it **must** have a method named `transform(value)`. The parser will call this method with the extracted value.
+
+**Custom class transforms must also have a constructor method** (either a default constructor or one that accepts arguments if you instantiate it yourself). The parser will instantiate the class using its constructor if you pass the class itself (not an instance).
 
 **Example of a valid custom class transform:**
 ```typescript
 class MyCustomPipe {
-  execute(value: string) {
+  // Default constructor
+  constructor() {}
+  transform(value: string) {
     // your transformation logic
     return value + '!';
+  }
+}
+
+class SuffixPipe {
+  constructor(private suffix: string) {}
+  transform(value: string) {
+    return value + this.suffix;
   }
 }
 

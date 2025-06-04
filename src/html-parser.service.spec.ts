@@ -888,13 +888,13 @@ describe('HtmlParserService', () => {
     `;
 
     class UppercasePipe {
-      execute(value: string) {
+      transform(value: string) {
         return value.toUpperCase();
       }
     }
     class SuffixPipe {
       constructor(private suffix: string) {}
-      execute(value: string) {
+      transform(value: string) {
         return value + this.suffix;
       }
     }
@@ -928,7 +928,7 @@ describe('HtmlParserService', () => {
         title: {
           selector: '//h1[@class="title"]/text()',
           type: 'xpath' as const,
-          transform: new SuffixPipe('!'),
+          transform: new SuffixPipe('!') as any,
         },
       };
       const result = service.extractStructured(simpleHtml, schema);
@@ -990,7 +990,7 @@ describe('HtmlParserService', () => {
               return match ? parseInt(match[1]) : 0;
             },
             new SuffixPipe(' (ep)'),
-          ],
+          ] as any,
         },
       };
       const result = service.extractStructured(simpleHtml, schema);
