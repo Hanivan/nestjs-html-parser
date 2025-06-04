@@ -365,16 +365,16 @@ console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
 
 The `transform` property in a schema field is highly flexible. You can use:
 - A single function: `(value: string) => any`
-- A single class (constructor with an `execute` method): `class MyPipe { execute(value) { ... } }` (the parser will instantiate it automatically)
-- A single instance (object with an `execute` method): `new MyPipe()`
+- A single class (constructor with a `transform` method): `class MyPipe { transform(value) { ... } }` (the parser will instantiate it automatically)
+- A single instance (object with a `transform` method): `new MyPipe()`
+- A class constructor with a `transform` method (e.g., `MyPipe`)
 - An array of any of the above (functions, classes, instances), which will be applied in order
 
 **Note:** The parser will always convert DOM elements to their text content before applying the transform, so your transform functions can safely expect a string.
 
 **Important:**
-If you use a class or object for `transform`, it **must** have a method named `transform(value)`. The parser will call this method with the extracted value.
-
-**Custom class transforms must also have a constructor method** (either a default constructor or one that accepts arguments if you instantiate it yourself). The parser will instantiate the class using its constructor if you pass the class itself (not an instance).
+- If you use a class or object for `transform`, it **must** have a method named `transform(value)`. The parser will call this method with the extracted value.
+- Custom class transforms must also have a constructor method (either a default constructor or one that accepts arguments if you instantiate it yourself). The parser will instantiate the class using its constructor if you pass the class itself (not an instance).
 
 **Example of a valid custom class transform:**
 ```typescript

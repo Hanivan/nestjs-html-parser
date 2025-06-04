@@ -334,9 +334,9 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
         type: 'xpath' as 'xpath',
         transform: [
           (title: string) => title.trim(),
-          UppercasePipe as any, // <-- class, will be instantiated automatically
+          UppercasePipe, // <-- class, will be instantiated automatically
           new SuffixPipe(' [ADVANCED]'), // <-- instance, used as is
-        ] as any,
+        ],
       },
       episode: {
         selector: './/div[@class="epz"]',
@@ -349,7 +349,7 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
             return match ? parseInt(match[1]) : 0;
           },
           new SuffixPipe(' (ep)'), // <-- instance, used as is
-        ] as any,
+        ],
       },
     };
     const advancedAnime = parser.extractStructuredList(

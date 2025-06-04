@@ -916,7 +916,7 @@ describe('HtmlParserService', () => {
         title: {
           selector: '//h1[@class="title"]/text()',
           type: 'xpath' as const,
-          transform: UppercasePipe as any,
+          transform: UppercasePipe,
         },
       };
       const result = service.extractStructured(simpleHtml, schema);
@@ -928,7 +928,7 @@ describe('HtmlParserService', () => {
         title: {
           selector: '//h1[@class="title"]/text()',
           type: 'xpath' as const,
-          transform: new SuffixPipe('!') as any,
+          transform: new SuffixPipe('!'),
         },
       };
       const result = service.extractStructured(simpleHtml, schema);
@@ -942,9 +942,9 @@ describe('HtmlParserService', () => {
           type: 'xpath' as const,
           transform: [
             (v: string) => v.trim(),
-            UppercasePipe as any,
+            UppercasePipe,
             new SuffixPipe('!'),
-          ] as any,
+          ],
         },
       };
       const result = service.extractStructured(simpleHtml, schema);
@@ -990,7 +990,7 @@ describe('HtmlParserService', () => {
               return match ? parseInt(match[1]) : 0;
             },
             new SuffixPipe(' (ep)'),
-          ] as any,
+          ],
         },
       };
       const result = service.extractStructured(simpleHtml, schema);
