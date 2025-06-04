@@ -954,10 +954,11 @@ export class HtmlParserService {
    *
    * Applies a schema object to extract multiple related fields from HTML content.
    * Each field in the schema defines its own selector, type, optional attribute,
-   * transformation function, and now supports a 'multiple' flag for array extraction.
+   * transformation function, and now supports 'multiple' and 'raw' flags for array and raw HTML extraction.
    *
    * If a schema field includes `multiple: true`, the extracted value for that field
    * will be an array of results (with transform applied to each item if provided).
+   * If a schema field includes `raw: true`, the extracted value will be the raw HTML of the matched element(s).
    * Otherwise, a single value is returned as before.
    *
    * @param html - HTML content to parse
@@ -966,7 +967,7 @@ export class HtmlParserService {
    * @param options.verbose - Enable verbose logging for debugging
    *
    * @returns Object with extracted data matching the schema structure. Fields with
-   *          `multiple: true` will be arrays, others will be single values.
+   *          `multiple: true` will be arrays, `raw: true` will be raw HTML, others will be single values.
    *
    * @example
    * ```typescript
@@ -990,6 +991,7 @@ export class HtmlParserService {
    *   image: string;
    *   rating: number;
    *   tags: string[]; // <-- array field
+   *   titleHtml: string; // <-- raw HTML field
    * }
    *
    * const productSchema: ExtractionSchema<Product> = {
@@ -1017,6 +1019,11 @@ export class HtmlParserService {
    *     selector: '//span[@class="tag"]/text()',
    *     type: 'xpath',
    *     multiple: true // <-- NEW: array extraction
+   *   },
+   *   titleHtml: {
+   *     selector: '//h1',
+   *     type: 'xpath',
+   *     raw: true // <-- NEW: raw HTML extraction
    *   }
    * };
    *
@@ -1027,7 +1034,8 @@ export class HtmlParserService {
    * //   price: 29.99,
    * //   image: "/image.jpg",
    * //   rating: 4,
-   * //   tags: ["electronics", "gadget"] // <-- array result
+   * //   tags: ["electronics", "gadget"], // <-- array result
+   * //   titleHtml: "<h1>Product Name</h1>" // <-- raw HTML result
    * // }
    * ```
    */
@@ -1043,6 +1051,7 @@ export class HtmlParserService {
       for (const [key, config] of Object.entries(schema)) {
         try {
           let value: any;
+          const raw = config.raw === true;
 
           if (config.multiple) {
             // Use extractMultiple for array fields
@@ -1052,13 +1061,23 @@ export class HtmlParserService {
                 config.selector,
                 config.attribute,
                 verbose,
+                raw,
               );
             } else {
-              value = this.extractMultipleCSS(
-                html,
-                config.selector,
-                config.attribute,
-              );
+              if (raw) {
+                value = this.extractMultipleCSS(
+                  html,
+                  config.selector,
+                  undefined,
+                  true,
+                );
+              } else {
+                value = this.extractMultipleCSS(
+                  html,
+                  config.selector,
+                  config.attribute,
+                );
+              }
             }
             // Apply transformation if provided
             if (config.transform) {
@@ -1072,13 +1091,23 @@ export class HtmlParserService {
                 config.selector,
                 config.attribute,
                 verbose,
+                raw,
               );
             } else {
-              value = this.extractSingleCSS(
-                html,
-                config.selector,
-                config.attribute,
-              );
+              if (raw) {
+                value = this.extractSingleCSS(
+                  html,
+                  config.selector,
+                  undefined,
+                  true,
+                );
+              } else {
+                value = this.extractSingleCSS(
+                  html,
+                  config.selector,
+                  config.attribute,
+                );
+              }
             }
             // Apply transformation if provided
             if (value && config.transform) {
@@ -1108,6 +1137,7 @@ export class HtmlParserService {
    *
    * For each container, applies the schema as in extractStructured. If a schema field
    * includes `multiple: true`, the extracted value for that field will be an array of results.
+   * If a schema field includes `raw: true`, the extracted value will be the raw HTML of the matched element(s).
    *
    * @param html - HTML content to parse
    * @param containerSelector - XPath or CSS selector to find container elements
@@ -1117,7 +1147,7 @@ export class HtmlParserService {
    * @param options.verbose - Enable verbose logging for debugging
    *
    * @returns Array of objects with extracted data matching the schema structure. Fields with
-   *          `multiple: true` will be arrays, others will be single values.
+   *          `multiple: true` will be arrays, `raw: true` will be raw HTML, others will be single values.
    *
    * @example
    * ```typescript
@@ -1142,6 +1172,7 @@ export class HtmlParserService {
    *   name: string;
    *   price: number;
    *   tags: string[]; // <-- array field
+   *   nameHtml: string; // <-- raw HTML field
    * }
    *
    * const productSchema: ExtractionSchema<Product> = {
@@ -1158,6 +1189,11 @@ export class HtmlParserService {
    *     selector: './/span[@class="tag"]/text()',
    *     type: 'xpath',
    *     multiple: true // <-- NEW: array extraction
+   *   },
+   *   nameHtml: {
+   *     selector: './/h3',
+   *     type: 'xpath',
+   *     raw: true // <-- NEW: raw HTML extraction
    *   }
    * };
    *
@@ -1166,10 +1202,10 @@ export class HtmlParserService {
    *   '//div[@class="product"]',
    *   productSchema
    * );
-   * // Result: Product[] with tags as array for each product
+   * // Result: Product[] with tags as array and nameHtml as raw HTML for each product
    * // [
-   * //   { name: "Product A", price: 19.99, tags: ["electronics", "gadget"] },
-   * //   { name: "Product B", price: 29.99, tags: ["accessory"] }
+   * //   { name: "Product A", price: 19.99, tags: ["electronics", "gadget"], nameHtml: "<h3>Product A</h3>" },
+   * //   { name: "Product B", price: 29.99, tags: ["accessory"], nameHtml: "<h3>Product B</h3>" }
    * // ]
    * ```
    */
@@ -1365,6 +1401,7 @@ export class HtmlParserService {
     selector: string,
     attribute?: string,
     verbose = false,
+    raw = false,
   ): string | null {
     try {
       // Handle attribute selectors differently
@@ -1372,6 +1409,7 @@ export class HtmlParserService {
         const elements = this.evaluateXPath(html, selector, verbose);
         if (elements.length > 0) {
           const element = elements[0] as any;
+          if (raw && element.outerHTML) return element.outerHTML;
           return element.getAttribute ? element.getAttribute(attribute) : null;
         }
         return null;
@@ -1382,6 +1420,8 @@ export class HtmlParserService {
         const elements = this.evaluateXPath(html, selector, verbose);
         if (elements.length > 0) {
           const textNode = elements[0] as any;
+          if (raw && textNode.parentNode && textNode.parentNode.outerHTML)
+            return textNode.parentNode.outerHTML;
           return (
             textNode.nodeValue ||
             textNode.textContent ||
@@ -1396,6 +1436,7 @@ export class HtmlParserService {
         const elements = this.evaluateXPath(html, selector, verbose);
         if (elements.length > 0) {
           const attrNode = elements[0] as any;
+          // No raw for attribute node
           return attrNode.value || attrNode.nodeValue || String(attrNode);
         }
         return null;
@@ -1405,6 +1446,7 @@ export class HtmlParserService {
       const elements = this.evaluateXPath(html, selector, verbose);
       if (elements.length > 0) {
         const element = elements[0] as any;
+        if (raw && element.outerHTML) return element.outerHTML;
         if (attribute) {
           return element.getAttribute ? element.getAttribute(attribute) : null;
         }
@@ -1425,6 +1467,7 @@ export class HtmlParserService {
     selector: string,
     attribute?: string,
     verbose = false,
+    raw = false,
   ): string[] {
     try {
       const results: string[] = [];
@@ -1433,6 +1476,10 @@ export class HtmlParserService {
       if (attribute && !selector.includes('/@')) {
         const elements = this.evaluateXPath(html, selector, verbose);
         for (const element of elements) {
+          if (raw && (element as any).outerHTML) {
+            results.push((element as any).outerHTML);
+            continue;
+          }
           const value = (element as any).getAttribute
             ? (element as any).getAttribute(attribute)
             : null;
@@ -1445,6 +1492,14 @@ export class HtmlParserService {
       if (selector.includes('/text()')) {
         const elements = this.evaluateXPath(html, selector, verbose);
         for (const element of elements) {
+          if (
+            raw &&
+            (element as any).parentNode &&
+            (element as any).parentNode.outerHTML
+          ) {
+            results.push((element as any).parentNode.outerHTML);
+            continue;
+          }
           const text =
             (element as any).nodeValue ||
             (element as any).textContent ||
@@ -1458,6 +1513,7 @@ export class HtmlParserService {
       if (selector.includes('/@')) {
         const elements = this.evaluateXPath(html, selector, verbose);
         for (const element of elements) {
+          // No raw for attribute node
           const value =
             (element as any).value ||
             (element as any).nodeValue ||
@@ -1470,6 +1526,10 @@ export class HtmlParserService {
       // Handle regular element selectors
       const elements = this.evaluateXPath(html, selector, verbose);
       for (const element of elements) {
+        if (raw && (element as any).outerHTML) {
+          results.push((element as any).outerHTML);
+          continue;
+        }
         const value = attribute
           ? (element as any).getAttribute
             ? (element as any).getAttribute(attribute)
@@ -1492,12 +1552,17 @@ export class HtmlParserService {
     html: string,
     selector: string,
     attribute?: string,
+    raw = false,
   ): string | null {
     try {
       const $ = cheerio.load(html);
       const element = $(selector).first();
 
       if (element.length === 0) return null;
+
+      if (raw) {
+        return $.html(element);
+      }
 
       if (attribute) {
         return element.attr(attribute) || null;
@@ -1513,6 +1578,7 @@ export class HtmlParserService {
     html: string,
     selector: string,
     attribute?: string,
+    raw = false,
   ): string[] {
     try {
       const $ = cheerio.load(html);
@@ -1521,6 +1587,10 @@ export class HtmlParserService {
 
       elements.each((_, element) => {
         const $element = $(element);
+        if (raw) {
+          results.push($.html($element));
+          return;
+        }
         if (attribute) {
           const value = $element.attr(attribute);
           if (value) results.push(value);

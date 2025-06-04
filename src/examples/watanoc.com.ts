@@ -60,6 +60,28 @@ async function demonstrateWatanocParser() {
     );
     console.log('Category links:', categoryLinks.slice(0, 5));
 
+    // === Raw HTML Extraction Example ===
+    console.log('\n=== Raw HTML Extraction Example ===');
+    const rawSchema: ExtractionSchema = {
+      navHtml: {
+        selector: '//nav',
+        type: 'xpath',
+        raw: true,
+      },
+      firstArticleTitleHtml: {
+        selector:
+          '(//h1[contains(@class, "entry-title") or contains(@id, "article")])[1]',
+        type: 'xpath',
+        raw: true,
+      },
+    };
+    const rawResult = parser.extractStructured(html, rawSchema);
+    console.log('Raw nav HTML:', rawResult.navHtml?.slice(0, 200) + '...');
+    console.log(
+      'Raw first article title HTML:',
+      rawResult.firstArticleTitleHtml,
+    );
+
     console.log('\n=== Article Metadata Extraction ===');
 
     // Define schema for article extraction

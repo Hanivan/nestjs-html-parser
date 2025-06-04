@@ -20,6 +20,10 @@ export interface ExtractionSchema<T = Record<string, any>> {
      * If true, extract an array of values instead of a single value
      */
     multiple?: boolean;
+    /**
+     * If true, return the raw HTML of the matched element(s) instead of text/attribute value
+     */
+    raw?: boolean;
   };
 }
 
@@ -44,4 +48,8 @@ export interface ExtractionField<T = any> {
    * If true, extract an array of values instead of a single value
    */
   multiple?: boolean;
+  /**
+   * If true, return the raw HTML of the matched element(s) instead of text/attribute value
+   */
+  raw?: boolean;
 }

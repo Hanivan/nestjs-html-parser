@@ -170,7 +170,8 @@ const schema = {
     attribute: 'datetime',
     transform: (value: string) => new Date(value)
   },
-  links: { selector: '//a/@href', type: 'xpath', multiple: true }
+  links: { selector: '//a/@href', type: 'xpath', multiple: true },
+  titleHtml: { selector: '//h1', type: 'xpath', raw: true }
 };
 const data = htmlParser.extractStructured(html, schema);
 ```
@@ -341,7 +342,7 @@ console.log(`Proxy is ${isWorking ? 'working' : 'not working'}`);
 
 #### `extractStructured<T = Record<string, any>>(html: string, schema: ExtractionSchema<T>, options?: { verbose?: boolean }): T`
 
-Extract data using a typed schema object. Supports `multiple: true` for array extraction in any field.
+Extract data using a typed schema object. Supports `multiple: true` for array extraction and `raw: true` for raw HTML extraction in any field.
 
 ```typescript
 import { ExtractionSchema } from '@hanivanrizky/nestjs-html-parser';
@@ -351,6 +352,7 @@ interface Article {
   title: string;
   author: string;
   links: string[];
+  titleHtml: string;
 }
 
 // Create typed schema
@@ -368,16 +370,21 @@ const schema: ExtractionSchema<Article> = {
     selector: '//a/@href',
     type: 'xpath',
     multiple: true
+  },
+  titleHtml: {
+    selector: '//title',
+    type: 'xpath',
+    raw: true
   }
 };
 
 const result = htmlParser.extractStructured<Article>(html, schema);
-// Result: { title: "Page Title", author: "John Doe", links: ["/home", "/about", ...] }
+// Result: { title: "Page Title", author: "John Doe", links: ["/home", "/about", ...], titleHtml: "<title>Page Title</title>" }
 ```
 
 #### `extractStructuredList<T = Record<string, any>>(html: string, containerSelector: string, schema: ExtractionSchema<T>, containerType?: 'xpath' | 'css', options?: { verbose?: boolean }): T[]`
 
-Extract arrays of typed structured data. Supports `multiple: true` for array extraction in any field.
+Extract arrays of typed structured data. Supports `multiple: true` for array extraction and `raw: true` for raw HTML extraction in any field.
 
 ```typescript
 // Define typed interface
@@ -385,6 +392,7 @@ interface Product {
   name: string;
   price: number;
   tags: string[];
+  nameHtml: string;
 }
 
 // Create typed schema
@@ -402,6 +410,11 @@ const productSchema: ExtractionSchema<Product> = {
     selector: './/span[@class="tag"]/text()',
     type: 'xpath',
     multiple: true
+  },
+  nameHtml: {
+    selector: './/h2',
+    type: 'xpath',
+    raw: true
   }
 };
 
@@ -410,7 +423,11 @@ const products = htmlParser.extractStructuredList<Product>(
   '//div[@class="product"]',
   productSchema
 );
-// Result: Product[] with tags as array for each product
+// Result: Product[] with tags as array and nameHtml as raw HTML for each product
+// [
+//   { name: "Product A", price: 19.99, tags: ["electronics", "gadget"], nameHtml: "<h2>Product A</h2>" },
+//   { name: "Product B", price: 29.99, tags: ["accessory"], nameHtml: "<h2>Product B</h2>" }
+// ]
 ```
 
 ## Development
