@@ -25,19 +25,14 @@ import { HtmlParserService } from './html-parser.service';
  * - Verbose logging for debugging
  * - Retry logic with configurable delays
  *
+ * @remarks
+ * Always use `HtmlParserModule.forRoot()` or `HtmlParserModule.forRootAsync()` for proper configuration and future-proof usage.
+ *
  * @example
- * ```typescript
- * // Basic usage with default configuration
+ * // Recommended: Advanced usage with custom configuration
  * import { Module } from '@nestjs/common';
  * import { HtmlParserModule } from '@hanivanrizky/nestjs-html-parser';
  *
- * @Module({
- *   imports: [HtmlParserModule], // Uses default configuration (loggerLevel: 'log')
- *   // ... other module configuration
- * })
- * export class AppModule {}
- *
- * // Advanced usage with custom configuration
  * @Module({
  *   imports: [
  *     HtmlParserModule.forRoot({
@@ -47,7 +42,7 @@ import { HtmlParserService } from './html-parser.service';
  * })
  * export class AppModule {}
  *
- * // Async configuration using ConfigService
+ * // Recommended: Async configuration using ConfigService
  * @Module({
  *   imports: [
  *     ConfigModule.forRoot(),
@@ -76,7 +71,6 @@ import { HtmlParserService } from './html-parser.service';
  *     return { title, status: response.status };
  *   }
  * }
- * ```
  */
 
 export interface HtmlParserModuleAsyncOptions
