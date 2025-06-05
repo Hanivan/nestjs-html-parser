@@ -242,7 +242,7 @@ async function demonstrateWatanocParser() {
     // Extract ranking numbers
     const rankings = parser.extractMultiple(
       html,
-      '//text()[matches(., "^[1-7]$")]',
+      '//ul[@class="recent_entries thumb"]//text()[. >= "1" and . <= "7" and string-length(.) = 1]',
     );
     console.log('Article rankings:', rankings);
 

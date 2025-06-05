@@ -211,17 +211,42 @@ async function demonstrateHtmlFetchResponse() {
     );
     console.log(`   Expires: ${response.headers.expires || 'Not set'}`);
 
-    // Calculate response size efficiency
-    const contentLength = parseInt(response.headers['content-length'] || '0');
-    const actualLength = response.data.length;
+    const contentLengthHeader = response.headers['content-length'];
+    const contentLength = contentLengthHeader
+      ? parseInt(contentLengthHeader, 10)
+      : 0;
+    const actualLength = response.data?.length || 0;
 
-    if (contentLength > 0) {
+    if (contentLength > 0 && actualLength >= 0) {
       const compression =
         ((contentLength - actualLength) / contentLength) * 100;
+
       console.log(`\n📊 Compression Analysis:`);
-      console.log(`   Declared Length: ${contentLength} bytes`);
-      console.log(`   Actual Length: ${actualLength} bytes`);
-      console.log(`   Compression: ${compression.toFixed(2)}%`);
+      console.log(
+        `   Declared Length: ${contentLength.toLocaleString()} bytes`,
+      );
+      console.log(`   Actual Length: ${actualLength.toLocaleString()} bytes`);
+
+      if (Number.isFinite(compression)) {
+        if (compression >= 0) {
+          console.log(`   Compression: ${compression.toFixed(2)}%`);
+        } else {
+          console.log(
+            `   Content Expansion: ${Math.abs(compression).toFixed(2)}% (larger than declared)`,
+          );
+        }
+      } else {
+        console.log(`   Compression: Unable to calculate (invalid data)`);
+      }
+    } else if (contentLength === 0 && actualLength > 0) {
+      console.log(`\n📊 Compression Analysis:`);
+      console.log(`   Declared Length: Not specified`);
+      console.log(`   Actual Length: ${actualLength.toLocaleString()} bytes`);
+      console.log(
+        `   Compression: Cannot calculate (no Content-Length header)`,
+      );
+    } else {
+      console.log(`\n📊 Compression Analysis: No content to analyze`);
     }
   } catch (error) {
     console.error(`❌ Performance analysis error: ${error.message}`);
