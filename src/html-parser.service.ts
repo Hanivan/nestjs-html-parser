@@ -259,12 +259,23 @@ export class HtmlParserService {
             'User-Agent': userAgent,
             ...config.headers,
           },
-          // SSL configuration
+          // SSL configuration - enhanced to handle modern SSL/TLS issues
           httpsAgent: new (require('https').Agent)({
             rejectUnauthorized: config.ignoreSSLErrors
               ? false
               : (config.rejectUnauthorized ?? true),
-            secureProtocol: config.ignoreSSLErrors ? 'TLSv1_method' : undefined,
+            // Use more modern and compatible TLS settings when ignoring SSL errors
+            secureProtocol: config.ignoreSSLErrors ? undefined : undefined,
+            minVersion: config.ignoreSSLErrors ? 'TLSv1' : undefined,
+            maxVersion: config.ignoreSSLErrors ? 'TLSv1.3' : undefined,
+            // Add cipher support for legacy servers
+            ciphers: config.ignoreSSLErrors
+              ? 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA'
+              : undefined,
+            // Disable server name indication validation for problematic sites
+            // checkServerIdentity: config.ignoreSSLErrors
+            //   ? () => undefined
+            //   : undefined,
           }),
         };
 
