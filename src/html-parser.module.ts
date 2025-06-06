@@ -1,5 +1,6 @@
 import {
   DynamicModule,
+  LogLevel,
   Module,
   ModuleMetadata,
   Provider,
@@ -137,7 +138,7 @@ export interface HtmlParserConfigFactory {
     HtmlParserService,
     {
       provide: HTML_PARSER_LOGGER_LEVEL,
-      useValue: 'log', // Default logger level
+      useValue: ['log', 'error', 'debug'] as LogLevel[],
     },
   ],
   exports: [HtmlParserService],
@@ -178,7 +179,7 @@ export class HtmlParserModule {
   static forRoot(config: HtmlParserConfig = {}): DynamicModule {
     const configProvider: Provider = {
       provide: HTML_PARSER_LOGGER_LEVEL,
-      useValue: config.loggerLevel || 'log',
+      useValue: config.loggerLevel || (['log', 'error', 'debug'] as LogLevel[]),
     };
 
     return {
@@ -275,7 +276,9 @@ export class HtmlParserModule {
           provide: HTML_PARSER_LOGGER_LEVEL,
           useFactory: async (...args: any[]) => {
             const config = await options.useFactory!(...args);
-            return config.loggerLevel || 'log';
+            return (
+              config.loggerLevel || (['log', 'error', 'debug'] as LogLevel[])
+            );
           },
           inject: options.inject || [],
         },
@@ -293,7 +296,9 @@ export class HtmlParserModule {
         provide: HTML_PARSER_LOGGER_LEVEL,
         useFactory: async (factory: HtmlParserConfigFactory) => {
           const config = await factory.createHtmlParserConfig();
-          return config.loggerLevel || 'log';
+          return (
+            config.loggerLevel || (['log', 'error', 'debug'] as LogLevel[])
+          );
         },
         inject,
       },

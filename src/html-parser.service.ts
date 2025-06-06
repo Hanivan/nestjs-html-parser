@@ -77,10 +77,10 @@ export class HtmlParserService {
    */
   constructor(
     @Inject(HTML_PARSER_LOGGER_LEVEL)
-    loggerLevel: LogLevel | Array<LogLevel> = ['log', 'error', 'debug'],
+    loggerLevel?: LogLevel | Array<LogLevel>,
   ) {
     this.logger = new Logger(HtmlParserService.name, { timestamp: true });
-    this.loggerLevel = loggerLevel;
+    this.loggerLevel = loggerLevel || ['log', 'error', 'debug'];
   }
 
   /**
