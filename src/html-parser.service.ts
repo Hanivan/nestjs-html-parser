@@ -62,6 +62,7 @@ export class HtmlParserService {
     verbose: false,
     rejectUnauthorized: true,
     ignoreSSLErrors: false,
+    disableServerIdentityCheck: false,
     maxRedirects: 5,
     retryOnErrors: {
       ssl: false,
@@ -179,6 +180,7 @@ export class HtmlParserService {
    * @param options.verbose - Enable verbose logging for debugging
    * @param options.rejectUnauthorized - Reject unauthorized SSL certificates (default: true)
    * @param options.ignoreSSLErrors - Skip SSL certificate verification entirely
+   * @param options.disableServerIdentityCheck - Disable server name indication (SNI) validation
    * @param options.maxRedirects - Maximum number of redirects to follow (default: 5)
    * @param options.retryOnErrors - Configure retry behavior for specific error types
    *
@@ -200,6 +202,11 @@ export class HtmlParserService {
    * // Ignore SSL completely (use with caution)
    * const response = await parser.fetchHtml('https://expired-cert-site.com', {
    *   ignoreSSLErrors: true
+   * });
+   *
+   * // Disable only server identity validation (for hostname mismatches)
+   * const response = await parser.fetchHtml('https://hostname-mismatch-site.com', {
+   *   disableServerIdentityCheck: true
    * });
    *
    * // Robust configuration for unreliable sites
@@ -233,6 +240,7 @@ export class HtmlParserService {
         retries: maxRetries,
         rejectUnauthorized: config.rejectUnauthorized,
         ignoreSSLErrors: config.ignoreSSLErrors,
+        disableServerIdentityCheck: config.disableServerIdentityCheck,
         maxRedirects: config.maxRedirects,
       });
     }
@@ -272,10 +280,10 @@ export class HtmlParserService {
             ciphers: config.ignoreSSLErrors
               ? 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA'
               : undefined,
-            // Disable server name indication validation for problematic sites
-            // checkServerIdentity: config.ignoreSSLErrors
-            //   ? () => undefined
-            //   : undefined,
+            // Configure server name indication validation for problematic sites
+            ...(config.disableServerIdentityCheck
+              ? { checkServerIdentity: () => undefined }
+              : {}), // When false or undefined, Node.js uses default tls.checkServerIdentity
           }),
         };
 

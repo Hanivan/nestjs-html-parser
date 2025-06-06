@@ -44,6 +44,13 @@ export interface HtmlParserOptions {
    */
   ignoreSSLErrors?: boolean;
   /**
+   * Disable server name indication (SNI) validation for SSL connections
+   * Useful for sites with hostname mismatches or problematic SSL configurations
+   * When true, bypasses server identity checks independent of other SSL settings
+   * @important MITM attacks can still be possible
+   */
+  disableServerIdentityCheck?: boolean;
+  /**
    * Maximum number of redirects to follow (default: 5)
    */
   maxRedirects?: number;

@@ -222,6 +222,107 @@ const html = await htmlParser.fetchHtml('https://example.com', {
 });
 ```
 
+### SSL/TLS Configuration & Security
+
+The HTML Parser Service provides three levels of SSL configuration for handling different certificate scenarios:
+
+#### 🔒 SSL Configuration Options (Independent Controls)
+
+The service provides **three independent SSL configuration options** that can be used alone or in combination:
+
+1. **`rejectUnauthorized: false`** - Accept invalid/self-signed certificates
+2. **`disableServerIdentityCheck: true`** - Skip hostname validation (independent option)
+3. **`ignoreSSLErrors: true`** - Disable all SSL validation (⚠️ Use with extreme caution)
+
+**🔑 Key Point:** `disableServerIdentityCheck` is **fully independent** of `ignoreSSLErrors` and only controls hostname validation.
+
+```typescript
+// Default: Full SSL validation (recommended for production)
+const response = await htmlParser.fetchHtml('https://trusted-site.com');
+
+// Accept self-signed certificates only
+const response = await htmlParser.fetchHtml('https://self-signed-site.com', {
+  rejectUnauthorized: false
+});
+
+// Skip only hostname validation (certificate still validated)
+const response = await htmlParser.fetchHtml('https://hostname-mismatch-site.com', {
+  disableServerIdentityCheck: true  // Works independently
+});
+
+// Combine: Accept invalid certs + skip hostname validation
+const response = await htmlParser.fetchHtml('https://problematic-site.com', {
+  rejectUnauthorized: false,
+  disableServerIdentityCheck: true  // Both options work together
+});
+
+// Disable all SSL validation (⚠️ DANGEROUS - development only)
+const response = await htmlParser.fetchHtml('https://any-ssl-issue-site.com', {
+  ignoreSSLErrors: true  // Overrides all SSL checks
+});
+
+// Mixed configuration: Disable all SSL but explicitly control hostname check
+const response = await htmlParser.fetchHtml('https://mixed-config-site.com', {
+  ignoreSSLErrors: true,
+  disableServerIdentityCheck: false  // Independent: hostname check still works
+});
+```
+
+#### ⚠️ **CRITICAL SECURITY WARNING: `disableServerIdentityCheck`**
+
+The `disableServerIdentityCheck` parameter bypasses server name indication (SNI) validation, which is a **critical security mechanism** that:
+
+- **Prevents man-in-the-middle attacks** by ensuring you're connecting to the intended server
+- **Validates hostname matches** between the certificate and the requested domain
+- **Protects against certificate spoofing** and domain impersonation
+
+**🚨 NEVER use `disableServerIdentityCheck: true` in production unless:**
+- You fully understand the security implications
+- You have other security measures in place (e.g., certificate pinning)
+- You are connecting to a known, trusted internal service with hostname mismatches
+- You are in a controlled testing environment
+
+**✅ Safe Use Cases:**
+- Development environments with self-hosted services
+- Testing against staging servers with certificate issues
+- Internal corporate networks with hostname mismatches
+- Temporary workarounds during certificate renewal periods
+
+**❌ NEVER Use In:**
+- Production applications handling sensitive data
+- Public-facing services
+- Financial or healthcare applications
+- Any scenario where security is paramount
+
+```typescript
+// ❌ DANGEROUS: Complete SSL bypass (never in production)
+const response = await htmlParser.fetchHtml(url, {
+  ignoreSSLErrors: true  // Disables ALL SSL validation including hostname check
+});
+
+// ⚠️ SELECTIVE: Independent hostname validation control
+const response = await htmlParser.fetchHtml(url, {
+  ignoreSSLErrors: true,
+  disableServerIdentityCheck: false  // Still enforces hostname validation despite ignoreSSLErrors
+});
+
+// ✅ BETTER: Minimal SSL relaxation
+const response = await htmlParser.fetchHtml(url, {
+  rejectUnauthorized: false,  // Accept invalid certificates only
+  disableServerIdentityCheck: false  // Keep hostname validation (default)
+});
+
+// ✅ TARGETED: Skip only hostname validation
+const response = await htmlParser.fetchHtml(url, {
+  disableServerIdentityCheck: true  // Only bypasses hostname check, certificate still validated
+});
+
+// ✅ PRODUCTION: Full SSL validation (default)
+const response = await htmlParser.fetchHtml(url, {
+  // All SSL validations enabled by default
+});
+```
+
 ### Error Handling
 
 ```typescript
@@ -319,6 +420,7 @@ interface HtmlParserOptions {
   verbose?: boolean;                   // Enable verbose logging (default: false)
   rejectUnauthorized?: boolean;        // Reject unauthorized SSL certificates (default: true)
   ignoreSSLErrors?: boolean;           // Skip SSL certificate verification (default: false)
+  disableServerIdentityCheck?: boolean; // ⚠️ SECURITY WARNING: Disable server name indication (SNI) validation (default: false)
   maxRedirects?: number;               // Maximum redirects to follow (default: 5)
   retryOnErrors?: {                    // Configure retry behavior for specific error types
     ssl?: boolean;                     // Retry on SSL/TLS errors (default: false)
@@ -402,7 +504,8 @@ const healthCheckOptions: HtmlParserOptions = {
   retryDelay: 500,                     // Quick retry for transient issues
   verbose: false,                      // Keep logging minimal in production
   rejectUnauthorized: false,           // Accept self-signed certificates
-  ignoreSSLErrors: true,               // Ignore SSL errors for monitoring
+  ignoreSSLErrors: true,               // ⚠️ Ignore SSL errors for monitoring (development only)
+  disableServerIdentityCheck: false,   // ✅ Independent: Keep hostname validation even with ignoreSSLErrors
   maxRedirects: 2,                     // Limit redirects for performance
   retryOnErrors: {
     ssl: false,                        // Don't retry SSL errors
@@ -424,7 +527,8 @@ const scrapingOptions: HtmlParserOptions = {
   retryDelay: 2000,                    // Respect rate limits
   verbose: false,                      // Enable only for debugging
   rejectUnauthorized: false,           // Handle various SSL configurations
-  ignoreSSLErrors: true,               // Skip SSL verification if needed
+  disableServerIdentityCheck: true,    // ⚠️ Independent: Skip only hostname validation
+  ignoreSSLErrors: false,              // Prefer minimal SSL relaxation (keeps certificate validation)
   maxRedirects: 5,                     // Follow redirects for content
   retryOnErrors: {
     ssl: false,                        // SSL errors usually permanent
@@ -446,7 +550,8 @@ const devOptions: HtmlParserOptions = {
   retryDelay: 1000,
   verbose: true,                       // Enable detailed logging
   rejectUnauthorized: false,           // Handle local/test SSL certificates
-  ignoreSSLErrors: true,
+  disableServerIdentityCheck: true,    // ✅ Independent: OK for development/testing only
+  ignoreSSLErrors: false,              // Prefer targeted SSL relaxation (keeps certificate validation)
   maxRedirects: 3,
   retryOnErrors: {
     ssl: false,
@@ -808,12 +913,14 @@ const title = htmlParser.extractSingle(html, '//h1/text()') ||
 
 #### `fetchHtml(url: string, options?: HtmlParserOptions): Promise<HtmlFetchResponse>`
 
-Fetch HTML content from a URL with comprehensive error handling.
+Fetch HTML content from a URL with comprehensive error handling and SSL configuration.
 
 ```typescript
 const response = await htmlParser.fetchHtml('https://example.com', {
   timeout: 10000,
   headers: { 'User-Agent': 'Custom Agent' },
+  rejectUnauthorized: false,           // Accept self-signed certificates
+  disableServerIdentityCheck: true,    // ⚠️ Skip hostname validation (use with caution)
   retryOnErrors: {
     ssl: true,
     timeout: true,
