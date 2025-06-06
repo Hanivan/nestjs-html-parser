@@ -25,6 +25,9 @@
   - [Data Extraction Methods](#data-extraction-methods)
   - [Proxy Support](#proxy-support)
   - [Error Handling](#error-handling)
+- [TypeScript Definitions & Types](#typescript-definitions--types)
+  - [Complete Interface Definitions](#complete-interface-definitions)
+  - [Implementation Guide](#implementation-guide)
 - [API Reference](#api-reference)
   - [Core Methods](#core-methods)
   - [Advanced Methods](#advanced-methods)
@@ -235,6 +238,568 @@ try {
   // Error is categorized by type (ssl, dns, timeout, etc.)
   console.error(`Failed: ${error.message}`);
 }
+```
+
+## TypeScript Definitions & Types
+
+### Complete Interface Definitions
+
+```typescript
+// ===== CORE SERVICE INTERFACE =====
+interface HtmlParserService {
+  // Main HTML fetching method
+  fetchHtml(url: string, options?: HtmlParserOptions): Promise<HtmlFetchResponse>;
+  
+  // Single value extraction methods
+  extractSingle<T = string>(
+    html: string,
+    selector: string,
+    type?: 'xpath' | 'css',           // Default: 'xpath'
+    attribute?: string,
+    options?: ExtractionOptions<T>
+  ): T | null;
+  
+  extractText<T = string>(
+    html: string,
+    selector: string,
+    type?: 'xpath' | 'css',           // Default: 'xpath'
+    options?: ExtractionOptions<T>
+  ): T | null;
+  
+  // Multiple value extraction methods  
+  extractMultiple<T = string>(
+    html: string,
+    selector: string,
+    type?: 'xpath' | 'css',           // Default: 'xpath'
+    attribute?: string,
+    options?: ExtractionOptions<T>
+  ): T[];
+  
+  extractAttributes<T = string>(
+    html: string,
+    selector: string,
+    attribute: string,
+    type?: 'xpath' | 'css',           // Default: 'xpath'
+    options?: ExtractionOptions<T>
+  ): T[];
+  
+  // Structured extraction methods
+  extractStructured<T = Record<string, any>>(
+    html: string,
+    schema: ExtractionSchema<T>,
+    options?: { verbose?: boolean }
+  ): T;
+  
+  extractStructuredList<T = Record<string, any>>(
+    html: string,
+    containerSelector: string,
+    schema: ExtractionSchema<T>,
+    containerType?: 'xpath' | 'css',  // Default: 'xpath'
+    options?: { verbose?: boolean }
+  ): T[];
+  
+  // Utility methods
+  exists(html: string, selector: string, type?: 'xpath' | 'css', options?: { verbose?: boolean }): boolean;
+  count(html: string, selector: string, type?: 'xpath' | 'css', options?: { verbose?: boolean }): number;
+  
+  // Advanced utility methods
+  getRandomUserAgent(): Promise<string>;
+  testProxy(proxy: ProxyConfig, testUrl?: string): Promise<boolean>;
+}
+
+// ===== CONFIGURATION TYPES =====
+interface HtmlParserOptions {
+  timeout?: number;                    // Request timeout in milliseconds (default: 10000)
+  headers?: Record<string, string>;    // Custom headers to send with request
+  userAgent?: string;                  // Custom user agent string (default: Mozilla/5.0...)
+  useRandomUserAgent?: boolean;        // Use random user agent (default: false)
+  proxy?: ProxyConfig;                 // Proxy configuration
+  retries?: number;                    // Number of retry attempts (default: 3)
+  retryDelay?: number;                 // Delay between retries in ms (default: 1000)
+  verbose?: boolean;                   // Enable verbose logging (default: false)
+  rejectUnauthorized?: boolean;        // Reject unauthorized SSL certificates (default: true)
+  ignoreSSLErrors?: boolean;           // Skip SSL certificate verification (default: false)
+  maxRedirects?: number;               // Maximum redirects to follow (default: 5)
+  retryOnErrors?: {                    // Configure retry behavior for specific error types
+    ssl?: boolean;                     // Retry on SSL/TLS errors (default: false)
+    timeout?: boolean;                 // Retry on connection timeout (default: true)
+    dns?: boolean;                     // Retry on DNS resolution errors (default: true)
+    connectionRefused?: boolean;       // Retry on connection refused errors (default: true)
+  };
+}
+
+interface HtmlFetchResponse {
+  data: string;                        // HTML content of the fetched page
+  headers: Record<string, string>;     // HTTP response headers as key-value pairs
+  status: number;                      // HTTP status code (e.g., 200, 404, 500)
+  statusText: string;                  // HTTP status text (e.g., 'OK', 'Not Found')
+}
+
+interface ProxyConfig {
+  url: string;                         // Proxy server URL (e.g., 'http://proxy.example.com:8080')
+  type?: 'http' | 'https' | 'socks4' | 'socks5';  // Type of proxy server (auto-detected from URL)
+  username?: string;                   // Username for proxy authentication
+  password?: string;                   // Password for proxy authentication
+}
+
+// ===== EXTRACTION TYPES =====
+type TransformFunction = (value: any) => any;
+type TransformObject = { transform: (value: any) => any };
+type TransformClass = new (...args: any[]) => TransformObject;
+type TransformType =
+  | TransformFunction
+  | TransformObject
+  | TransformClass
+  | Array<TransformFunction | TransformObject | TransformClass>;
+
+interface ExtractionOptions<T = any> {
+  verbose?: boolean;                   // Enable verbose logging for this extraction
+  transform?: TransformType;           // Transform to apply to extracted value
+}
+
+interface ExtractionField<T = any> {
+  selector: string;                    // CSS selector or XPath expression
+  type: 'xpath' | 'css';              // Type of selector being used
+  attribute?: string;                  // HTML attribute to extract from selected element
+  transform?: TransformType;           // Transform to apply to extracted value
+  multiple?: boolean;                  // If true, extract array of values instead of single value
+  raw?: boolean;                       // If true, return raw HTML of matched element(s)
+}
+
+interface ExtractionSchema<T = Record<string, any>> {
+  [K in keyof T]: ExtractionField<T[K]>;
+}
+
+// ===== MODULE CONFIGURATION TYPES =====
+type LogLevel = 'debug' | 'log' | 'warn' | 'error' | 'verbose'; // same LogLevel type from @nestjs/common
+
+interface HtmlParserConfig {
+  loggerLevel?: LogLevel | Array<LogLevel>;  // Default: ['log', 'error']
+}
+
+interface HtmlParserModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+  useExisting?: Type<HtmlParserConfigFactory>;
+  useClass?: Type<HtmlParserConfigFactory>;
+  useFactory?: (...args: any[]) => Promise<HtmlParserConfig> | HtmlParserConfig;
+  inject?: any[];
+}
+
+interface HtmlParserConfigFactory {
+  createHtmlParserConfig(): Promise<HtmlParserConfig> | HtmlParserConfig;
+}
+```
+
+### Implementation Guide
+
+#### ✅ **Production-Ready Configuration Patterns**
+
+**For Health Checks / Monitoring:**
+```typescript
+const healthCheckOptions: HtmlParserOptions = {
+  timeout: 15000,                      // Shorter timeout for health checks
+  useRandomUserAgent: true,            // Avoid being blocked
+  retries: 1,                          // Fast fail for health checks
+  retryDelay: 500,                     // Quick retry for transient issues
+  verbose: false,                      // Keep logging minimal in production
+  rejectUnauthorized: false,           // Accept self-signed certificates
+  ignoreSSLErrors: true,               // Ignore SSL errors for monitoring
+  maxRedirects: 2,                     // Limit redirects for performance
+  retryOnErrors: {
+    ssl: false,                        // Don't retry SSL errors
+    timeout: false,                    // Don't retry timeouts in health checks
+    dns: true,                         // Retry DNS errors only
+    connectionRefused: false,          // Don't retry connection refused
+  },
+};
+
+const response: HtmlFetchResponse = await htmlParser.fetchHtml(url, healthCheckOptions);
+```
+
+**For Web Scraping / Data Extraction:**
+```typescript
+const scrapingOptions: HtmlParserOptions = {
+  timeout: 30000,                      // Longer timeout for content loading
+  useRandomUserAgent: true,            // Rotate user agents to avoid blocking
+  retries: 3,                          // More persistent for data extraction
+  retryDelay: 2000,                    // Respect rate limits
+  verbose: false,                      // Enable only for debugging
+  rejectUnauthorized: false,           // Handle various SSL configurations
+  ignoreSSLErrors: true,               // Skip SSL verification if needed
+  maxRedirects: 5,                     // Follow redirects for content
+  retryOnErrors: {
+    ssl: false,                        // SSL errors usually permanent
+    timeout: true,                     // Retry timeouts for slow sites
+    dns: true,                         // Retry DNS resolution failures
+    connectionRefused: false,          // Usually indicates server issues
+  },
+};
+
+const response: HtmlFetchResponse = await htmlParser.fetchHtml(url, scrapingOptions);
+```
+
+**For Development / Testing:**
+```typescript
+const devOptions: HtmlParserOptions = {
+  timeout: 10000,
+  useRandomUserAgent: false,           // Consistent user agent for testing
+  retries: 1,                          // Fail fast during development
+  retryDelay: 1000,
+  verbose: true,                       // Enable detailed logging
+  rejectUnauthorized: false,           // Handle local/test SSL certificates
+  ignoreSSLErrors: true,
+  maxRedirects: 3,
+  retryOnErrors: {
+    ssl: false,
+    timeout: false,                    // Don't retry to see issues quickly
+    dns: true,
+    connectionRefused: false,
+  },
+};
+```
+
+#### ✅ **Type-Safe Extraction Patterns**
+
+**Single Value Extraction with Transformations:**
+```typescript
+// Extract and transform to number
+const pageId = htmlParser.extractSingle<number>(
+  html, 
+  '//meta[@name="page-id"]', 
+  'xpath', 
+  'content',
+  { transform: (value: string) => parseInt(value, 10) }
+);
+
+// Extract and validate boolean
+const isPublished = htmlParser.extractSingle<boolean>(
+  html,
+  '//meta[@property="article:published"]',
+  'xpath',
+  'content',
+  { transform: (value: string) => value.toLowerCase() === 'true' }
+);
+
+// Extract date with validation
+const publishedDate = htmlParser.extractSingle<Date | null>(
+  html,
+  '//time[@datetime]',
+  'xpath',
+  'datetime',
+  { 
+    transform: (value: string) => {
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+    }
+  }
+);
+```
+
+**Multiple Value Extraction with Type Safety:**
+```typescript
+// Extract numeric arrays with validation
+const prices = htmlParser.extractMultiple<number>(
+  html,
+  '//span[@class="price"]/text()',
+  'xpath',
+  undefined,
+  { 
+    transform: (value: string) => {
+      const price = parseFloat(value.replace(/[$,]/g, ''));
+      return isNaN(price) ? 0 : price;
+    }
+  }
+);
+
+// Extract URLs with validation
+const imageUrls = htmlParser.extractAttributes<string>(
+  html,
+  '//img[@src]',
+  'src',
+  'xpath',
+  {
+    transform: (url: string) => {
+      try {
+        return new URL(url, 'https://example.com').href;
+      } catch {
+        return '';
+      }
+    }
+  }
+).filter(url => url !== '');
+```
+
+**Advanced Structured Extraction:**
+```typescript
+// Define comprehensive interfaces
+interface Article {
+  title: string;
+  author: string;
+  publishedDate: Date | null;
+  tags: string[];
+  excerpt: string;
+  content: string;
+  wordCount: number;
+  socialShares: number;
+  isSponsored: boolean;
+  metadata: {
+    description: string;
+    keywords: string[];
+  };
+}
+
+// Create production-ready schema
+const articleSchema: ExtractionSchema<Article> = {
+  title: {
+    selector: '//h1[@class="article-title"]/text() | //title/text()',
+    type: 'xpath',
+    transform: (title: string) => title.trim().replace(/\s+/g, ' ')
+  },
+  author: {
+    selector: '//meta[@name="author"]',
+    type: 'xpath',
+    attribute: 'content',
+    transform: (author: string) => author || 'Unknown'
+  },
+  publishedDate: {
+    selector: '//time[@datetime] | //meta[@property="article:published_time"]',
+    type: 'xpath',
+    attribute: 'datetime',
+    transform: (dateStr: string) => {
+      if (!dateStr) return null;
+      const date = new Date(dateStr);
+      return isNaN(date.getTime()) ? null : date;
+    }
+  },
+  tags: {
+    selector: '//meta[@name="keywords"]',
+    type: 'xpath',
+    attribute: 'content',
+    transform: (keywords: string) => 
+      keywords ? keywords.split(',').map(k => k.trim()).filter(k => k) : []
+  },
+  excerpt: {
+    selector: '//meta[@name="description"]',
+    type: 'xpath',
+    attribute: 'content',
+    transform: (desc: string) => desc || ''
+  },
+  content: {
+    selector: '//article | //div[@class="content"]',
+    type: 'xpath',
+    raw: true
+  },
+  wordCount: {
+    selector: '//article//text() | //div[@class="content"]//text()',
+    type: 'xpath',
+    multiple: true,
+    transform: (texts: string[]) => 
+      texts.join(' ').split(/\s+/).filter(word => word.length > 0).length
+  },
+  socialShares: {
+    selector: '//span[@class="share-count"]/text()',
+    type: 'xpath',
+    transform: (shares: string) => parseInt(shares?.replace(/[^0-9]/g, '') || '0', 10)
+  },
+  isSponsored: {
+    selector: '//div[contains(@class, "sponsored")] | //span[contains(text(), "Sponsored")]',
+    type: 'xpath',
+    transform: () => true
+  },
+  metadata: {
+    selector: '//head',
+    type: 'xpath',
+    transform: (headElement: any) => {
+      // Extract nested metadata
+      const description = htmlParser.extractSingle(
+        headElement,
+        '//meta[@name="description"]',
+        'xpath',
+        'content'
+      ) || '';
+      
+      const keywords = htmlParser.extractSingle(
+        headElement,
+        '//meta[@name="keywords"]',
+        'xpath',
+        'content'
+      ) || '';
+      
+      return {
+        description,
+        keywords: keywords.split(',').map(k => k.trim()).filter(k => k)
+      };
+    }
+  }
+};
+
+const article: Article = htmlParser.extractStructured<Article>(html, articleSchema);
+```
+
+**Advanced Transform Pipeline:**
+```typescript
+// Define reusable transform classes
+class UppercasePipe {
+  transform(value: string): string {
+    return value.toUpperCase();
+  }
+}
+
+class TrimPipe {
+  transform(value: string): string {
+    return value.trim().replace(/\s+/g, ' ');
+  }
+}
+
+class NumberPipe {
+  constructor(private defaultValue: number = 0) {}
+  
+  transform(value: string): number {
+    const num = parseFloat(value.replace(/[^0-9.-]/g, ''));
+    return isNaN(num) ? this.defaultValue : num;
+  }
+}
+
+// Use in extraction schema
+const productSchema: ExtractionSchema<any> = {
+  name: {
+    selector: '//h1/text()',
+    type: 'xpath',
+    transform: [
+      TrimPipe,
+      UppercasePipe,
+      (name: string) => name.substring(0, 100) // Limit length
+    ]
+  },
+  price: {
+    selector: '//span[@class="price"]/text()',
+    type: 'xpath',
+    transform: new NumberPipe(0)
+  }
+};
+```
+
+#### ⚠️ **Common Implementation Mistakes to Avoid**
+
+**Type and Method Signature Errors:**
+```typescript
+// ❌ WRONG: Missing type parameters and incorrect XPath
+const result = htmlParser.extractSingle(html, '//wrongtag');
+
+// ✅ CORRECT: Proper type and XPath for text content
+const result: string | null = htmlParser.extractSingle<string>(html, '//title/text()');
+
+// ❌ WRONG: Using wrong method for attribute extraction
+const urls = htmlParser.extractSingle(html, '//a', 'xpath', 'href', { multiple: true });
+
+// ✅ CORRECT: Use dedicated method for attributes
+const urls: string[] = htmlParser.extractAttributes<string>(html, '//a', 'href');
+
+// ❌ WRONG: Mixing CSS and XPath syntax
+const links = htmlParser.extractMultiple(html, 'a//text()', 'css');
+
+// ✅ CORRECT: Use appropriate selector type
+const links = htmlParser.extractMultiple(html, '//a/text()', 'xpath');
+// OR
+const links = htmlParser.extractMultiple(html, 'a', 'css');
+```
+
+**Configuration and Error Handling Mistakes:**
+```typescript
+// ❌ WRONG: Missing proper response typing and error handling
+const response = await htmlParser.fetchHtml(url);
+const title = response.data.match(/<title>(.*?)<\/title>/)?.[1];
+
+// ✅ CORRECT: Proper typing and extraction
+const response: HtmlFetchResponse = await htmlParser.fetchHtml(url, options);
+const title: string | null = htmlParser.extractSingle<string>(
+  response.data, 
+  '//title/text()'
+);
+
+// ❌ WRONG: Ignoring status codes and error types
+try {
+  const html = await htmlParser.fetchHtml(url);
+} catch (error) {
+  console.log('Failed to fetch');
+}
+
+// ✅ CORRECT: Comprehensive error handling
+try {
+  const response: HtmlFetchResponse = await htmlParser.fetchHtml(url, options);
+  
+  if (response.status >= 400) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  
+  // Process response.data
+} catch (error: any) {
+  if (error.code === 'ETIMEDOUT') {
+    // Handle timeout specifically
+  } else if (error.code === 'ECONNREFUSED') {
+    // Handle connection refused
+  } else if (error.code?.includes('CERT_')) {
+    // Handle SSL certificate errors
+  } else if (error.code === 'ENOTFOUND') {
+    // Handle DNS resolution errors
+  } else {
+    // Handle other errors
+  }
+}
+```
+
+#### 🔧 **Advanced Usage Patterns**
+
+**Proxy Testing and Validation:**
+```typescript
+const proxyConfig: ProxyConfig = {
+  url: 'http://proxy.example.com:8080',
+  type: 'http',
+  username: 'user',
+  password: 'pass'
+};
+
+// Test proxy before use
+const isProxyWorking = await htmlParser.testProxy(proxyConfig);
+if (!isProxyWorking) {
+  throw new Error('Proxy connection failed');
+}
+
+// Use proxy for requests
+const response = await htmlParser.fetchHtml(url, { proxy: proxyConfig });
+```
+
+**User Agent Management:**
+```typescript
+// Get random user agent for stealth scraping
+const randomUA = await htmlParser.getRandomUserAgent();
+console.log('Using User Agent:', randomUA);
+
+// Use in options
+const options: HtmlParserOptions = {
+  userAgent: randomUA,
+  // OR use built-in random generation
+  useRandomUserAgent: true
+};
+```
+
+**Conditional Extraction and Fallbacks:**
+```typescript
+// Check existence before extraction
+if (htmlParser.exists(html, '//div[@class="premium-content"]')) {
+  const premiumContent = htmlParser.extractText(html, '//div[@class="premium-content"]');
+} else {
+  const freeContent = htmlParser.extractText(html, '//div[@class="free-content"]');
+}
+
+// Count elements for validation
+const commentCount = htmlParser.count(html, '//div[@class="comment"]');
+console.log(`Found ${commentCount} comments`);
+
+// Multiple selector fallback pattern
+const title = htmlParser.extractSingle(html, '//h1/text()') ||
+              htmlParser.extractSingle(html, '//title/text()') ||
+              htmlParser.extractSingle(html, '//meta[@property="og:title"]', 'xpath', 'content') ||
+              'No title found';
 ```
 
 ## API Reference
