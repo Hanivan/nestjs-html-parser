@@ -4,12 +4,12 @@ import { ExtractionSchema, HtmlParserService } from '../';
  * Advanced Transform Pipes Example
  *
  * This example demonstrates the new advanced transform functionality that supports
- * pipe arrays with baseUrl context, similar to the forum-crawler system.
+ * pipe arrays with baseUrl context, similar to the inspiration system.
  * It shows how to chain multiple transform pipes where each pipe's output
  * becomes the input for the next pipe.
  */
 
-// Mock pipe classes that mimic the forum-crawler pipe system
+// Mock pipe classes that mimic the inspiration pipe system
 class ParseAsURLPipe {
   baseUrl?: string;
 
@@ -106,7 +106,9 @@ interface ProductListing {
   rating: number;
 }
 
-async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void> {
+async function demonstrateAdvancedTransformPipes(
+  verbose = false,
+): Promise<void> {
   const parser = new HtmlParserService();
 
   console.log('🔧 Advanced Transform Pipes Demo');
@@ -140,7 +142,7 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
   const forumSchema: ExtractionSchema<ForumPost> = {
     title: {
       selector: './/h3/a/text()',
-      type: 'xpath'
+      type: 'xpath',
     },
     link: {
       selector: './/h3/a',
@@ -149,16 +151,22 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
       // This is the key improvement - pipe array with baseUrl context!
       transform: [
         { class: ParseAsURLPipe }, // Converts relative URL to absolute URL
-        { class: QueryAppendPipe, payload: { queryParams: { utm_source: 'parser', ref: 'demo' } } } // Adds tracking parameters
-      ]
+        {
+          class: QueryAppendPipe,
+          payload: { queryParams: { utm_source: 'parser', ref: 'demo' } },
+        }, // Adds tracking parameters
+      ],
     },
     author: {
       selector: './/div[@class="author"]/text()',
       type: 'xpath',
       transform: [
-        { class: RegexReplacePipe, payload: { regex: '^By: ', textReplacement: '', flag: 'i' } }, // Remove "By: " prefix
-        (author: string) => author.trim() // Additional cleanup
-      ]
+        {
+          class: RegexReplacePipe,
+          payload: { regex: '^By: ', textReplacement: '', flag: 'i' },
+        }, // Remove "By: " prefix
+        (author: string) => author.trim(), // Additional cleanup
+      ],
     },
     replies: {
       selector: './/div[@class="stats"]/text()',
@@ -169,8 +177,8 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
           const match = stats.match(/Replies:\s*(\d+)/);
           return match ? match[1] : '0';
         },
-        { class: NumberNormalizePipe } // Convert to number (handles 1k, 1.2k, etc.)
-      ]
+        { class: NumberNormalizePipe }, // Convert to number (handles 1k, 1.2k, etc.)
+      ],
     },
     views: {
       selector: './/div[@class="stats"]/text()',
@@ -181,17 +189,20 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
           const match = stats.match(/Views:\s*([\d\.k]+)/);
           return match ? match[1] : '0';
         },
-        { class: NumberNormalizePipe } // Convert to number (handles 1k, 1.2k, etc.)
-      ]
+        { class: NumberNormalizePipe }, // Convert to number (handles 1k, 1.2k, etc.)
+      ],
     },
     lastPost: {
       selector: './/div[@class="last-post"]/text()',
       type: 'xpath',
       transform: [
-        { class: RegexReplacePipe, payload: { regex: 'Last post: (.+)', textReplacement: '$1' } }, // Extract date string
-        { class: DateFormatPipe } // Convert to Unix timestamp
-      ]
-    }
+        {
+          class: RegexReplacePipe,
+          payload: { regex: 'Last post: (.+)', textReplacement: '$1' },
+        }, // Extract date string
+        { class: DateFormatPipe }, // Convert to Unix timestamp
+      ],
+    },
   };
 
   try {
@@ -199,9 +210,10 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
     console.log();
 
     // Demonstrate getOrigin utility method
-    const fullUrl = 'https://www.bmw-sg.com/forums/forums/introduction-greetings.24/page-5';
+    const fullUrl =
+      'https://www.bmw-sg.com/forums/forums/introduction-greetings.24/page-5';
     const baseUrl = parser.getOrigin(fullUrl);
-    
+
     console.log(`🔗 URL Origin Extraction:`);
     console.log(`   Full URL: ${fullUrl}`);
     console.log(`   Extracted Origin: ${baseUrl}`);
@@ -209,7 +221,11 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
 
     // Debug: Test raw extraction without transforms
     console.log(`🔍 Debug: Raw stats extraction:`);
-    const rawStats = parser.extractMultiple(forumHtml, '//div[@class="stats"]/text()', 'xpath');
+    const rawStats = parser.extractMultiple(
+      forumHtml,
+      '//div[@class="stats"]/text()',
+      'xpath',
+    );
     rawStats.forEach((stat, index) => {
       console.log(`   Thread ${index + 1}: "${stat}"`);
     });
@@ -223,8 +239,8 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
       'xpath',
       {
         verbose,
-        baseUrl // Using extracted origin - This solves the ERR_INVALID_URL issue!
-      }
+        baseUrl, // Using extracted origin - This solves the ERR_INVALID_URL issue!
+      },
     );
 
     console.log(`✅ Successfully extracted ${posts.length} forum posts`);
@@ -237,13 +253,15 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
       console.log(`   Author: ${post.author}`);
       console.log(`   Replies: ${post.replies}`);
       console.log(`   Views: ${post.views}`);
-      console.log(`   Last Post: ${new Date(post.lastPost * 1000).toISOString()}`);
+      console.log(
+        `   Last Post: ${new Date(post.lastPost * 1000).toISOString()}`,
+      );
       console.log();
     });
 
     // Demonstrate single value extraction with pipe arrays
     console.log('🎯 Single value extraction with transform pipes:');
-    
+
     const singleLink = parser.extractSingle<string>(
       '<a href="/test/path">Test Link</a>',
       '//a',
@@ -253,9 +271,12 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
         baseUrl: 'https://example.com',
         transform: [
           { class: ParseAsURLPipe },
-          { class: QueryAppendPipe, payload: { queryParams: { source: 'test' } } }
-        ]
-      }
+          {
+            class: QueryAppendPipe,
+            payload: { queryParams: { source: 'test' } },
+          },
+        ],
+      },
     );
 
     console.log(`   Original: "/test/path"`);
@@ -276,9 +297,12 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
         baseUrl: 'https://example.com',
         transform: [
           { class: ParseAsURLPipe },
-          { class: QueryAppendPipe, payload: { queryParams: { batch: 'multi' } } }
-        ]
-      }
+          {
+            class: QueryAppendPipe,
+            payload: { queryParams: { batch: 'multi' } },
+          },
+        ],
+      },
     );
 
     console.log('📦 Multiple links with transform pipes:');
@@ -289,12 +313,12 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
     // Demonstrate different getOrigin use cases
     console.log();
     console.log('🌐 getOrigin() Method Examples:');
-    
+
     const urlExamples = [
       'https://www.bmw-sg.com/forums/forums/introduction-greetings.24/page-5',
       'http://example.com:8080/path/to/page?param=value#section',
       'https://subdomain.domain.co.uk/very/long/path/here',
-      'https://api.github.com/repos/owner/repo/issues/123'
+      'https://api.github.com/repos/owner/repo/issues/123',
     ];
 
     urlExamples.forEach((url, index) => {
@@ -307,7 +331,6 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
         console.log(`      Error: ${error.message}`);
       }
     });
-
   } catch (error) {
     console.error('❌ Error during extraction:', error);
     throw error;
@@ -315,7 +338,9 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
 }
 
 // Product example showing different pipe combinations
-async function demonstrateProductTransformPipes(verbose = false): Promise<void> {
+async function demonstrateProductTransformPipes(
+  verbose = false,
+): Promise<void> {
   console.log();
   console.log('🛍️ Product Transform Pipes Demo');
   console.log('='.repeat(50));
@@ -341,7 +366,7 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
     name: {
       selector: './/h3/a/text()',
       type: 'xpath',
-      transform: (name: string) => name.trim()
+      transform: (name: string) => name.trim(),
     },
     url: {
       selector: './/h3/a',
@@ -349,8 +374,13 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
       attribute: 'href',
       transform: [
         { class: ParseAsURLPipe },
-        { class: QueryAppendPipe, payload: { queryParams: { category: 'electronics', source: 'listing' } } }
-      ]
+        {
+          class: QueryAppendPipe,
+          payload: {
+            queryParams: { category: 'electronics', source: 'listing' },
+          },
+        },
+      ],
     },
     price: {
       selector: './/span[@class="price"]/text()',
@@ -361,21 +391,25 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
           const cleanPrice = priceText.replace(/[^\d.]/g, '');
           return cleanPrice || '0';
         },
-        (price: string) => parseFloat(price)
-      ]
+        (price: string) => parseFloat(price),
+      ],
     },
     rating: {
       selector: './/div[@class="rating"]/text()',
       type: 'xpath',
       transform: [
-        { class: RegexReplacePipe, payload: { regex: '([\\d\\.]+) stars.*', textReplacement: '$1' } },
-        (rating: string) => parseFloat(rating)
-      ]
-    }
+        {
+          class: RegexReplacePipe,
+          payload: { regex: '([\\d\\.]+) stars.*', textReplacement: '$1' },
+        },
+        (rating: string) => parseFloat(rating),
+      ],
+    },
   };
 
   // Extract origin from a full URL for convenience
-  const fullShopUrl = 'https://shop.example.com/category/electronics?sort=price';
+  const fullShopUrl =
+    'https://shop.example.com/category/electronics?sort=price';
   const shopBaseUrl = parser.getOrigin(fullShopUrl);
 
   const products = parser.extractStructuredList<ProductListing>(
@@ -385,13 +419,17 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
     'xpath',
     {
       verbose,
-      baseUrl: shopBaseUrl // Using extracted origin
-    }
+      baseUrl: shopBaseUrl, // Using extracted origin
+    },
   );
 
   // Debug: Test raw price extraction
   console.log(`🔍 Debug: Raw price extraction:`);
-  const rawPrices = parser.extractMultiple(productHtml, '//span[@class="price"]/text()', 'xpath');
+  const rawPrices = parser.extractMultiple(
+    productHtml,
+    '//span[@class="price"]/text()',
+    'xpath',
+  );
   rawPrices.forEach((price, index) => {
     console.log(`   Product ${index + 1}: "${price}"`);
   });
@@ -411,13 +449,13 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
 }
 
 export {
+  DateFormatPipe,
   demonstrateAdvancedTransformPipes,
   demonstrateProductTransformPipes,
+  NumberNormalizePipe,
   ParseAsURLPipe,
   QueryAppendPipe,
   RegexReplacePipe,
-  NumberNormalizePipe,
-  DateFormatPipe
 };
 
 // Run the demonstration if this file is executed directly
@@ -426,8 +464,10 @@ if (require.main === module) {
     try {
       await demonstrateAdvancedTransformPipes(true);
       await demonstrateProductTransformPipes(true);
-      
-      console.log('🎉 All advanced transform pipe demonstrations completed successfully!');
+
+      console.log(
+        '🎉 All advanced transform pipe demonstrations completed successfully!',
+      );
     } catch (error) {
       console.error('💥 Demo failed:', error);
       process.exit(1);

@@ -5,7 +5,7 @@ import { ExtractionSchema, HtmlParserService } from '../';
  *
  * This example demonstrates a full forum crawling process based on the real BMW-SG forum payload.
  * It loads HTML from https://www.bmw-sg.com/forums/forums/introduction-greetings.24/page-5
- * and applies extraction schemas matching the forum-crawler payload structure.
+ * and applies extraction schemas matching the inspiration payload structure.
  */
 const payload = {
   data: {
@@ -155,7 +155,7 @@ const payload = {
   },
 };
 
-// Pipe classes following forum-crawler structure
+// Pipe classes following inspiration structure
 class ParseAsUrlPipe {
   type = 'parse-as-url';
   baseUrl?: string;
@@ -278,7 +278,7 @@ class ThreadIdExtractorPipe {
   }
 }
 
-// Define interfaces based on forum-crawler payload structure
+// Define interfaces based on inspiration payload structure
 interface ForumThread {
   threadId: string;
   threadTitle: string;
@@ -302,7 +302,7 @@ const mappingTransform = (rawPipes: any[], withItsPayload?: any): any[] => {
   if (!rawPipes || !Array.isArray(rawPipes)) return [];
 
   return rawPipes.map((pipe) => {
-    // Handle different pipe types based on forum-crawler CleanerType enum
+    // Handle different pipe types based on inspiration CleanerType enum
     switch (pipe.type) {
       case 'parse-as-url':
         return {
@@ -371,7 +371,7 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
   console.log('🏎️ BMW-SG Forum Scraper Demo');
   console.log('='.repeat(50));
 
-  // Forum-crawler payload configuration
+  // inspiration payload configuration
   const endPoint = payload.data.endPoint;
   const baseUrl = parser.getOrigin(endPoint);
 
@@ -396,7 +396,7 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
     console.log(`📊 Response status: ${response.status}`);
     console.log();
 
-    // 1. Thread extraction based on forum-crawler patternPost
+    // 1. Thread extraction based on inspiration patternPost
     console.log('📝 Thread Extraction (patternPost)');
     console.log('-'.repeat(40));
 
@@ -499,7 +499,7 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
       console.log();
     });
 
-    // 2. Reply extraction based on forum-crawler patternReply
+    // 2. Reply extraction based on inspiration patternReply
     console.log('💬 Reply Extraction (patternReply)');
     console.log('-'.repeat(40));
 
