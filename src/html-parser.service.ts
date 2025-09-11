@@ -607,7 +607,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided and result exists
       if (result !== null && options?.transform) {
-        return this.applyTransform(result, options.transform);
+        return this.applyTransform(result, options.transform, options.baseUrl);
       }
 
       // Return as T if no transform (assumes T extends string when no transform)
@@ -719,7 +719,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided
       if (options?.transform) {
-        return this.applyTransform(results, options.transform);
+        return this.applyTransform(results, options.transform, options.baseUrl);
       }
 
       // Return as T[] if no transform (assumes T extends string when no transform)
@@ -788,7 +788,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided and result exists
       if (result !== null && options?.transform) {
-        return this.applyTransform(result, options.transform);
+        return this.applyTransform(result, options.transform, options.baseUrl);
       }
 
       // Return as T if no transform (assumes T extends string when no transform)
@@ -866,7 +866,7 @@ export class HtmlParserService {
 
       // Apply transformation if provided
       if (options?.transform) {
-        return this.applyTransform(results, options.transform);
+        return this.applyTransform(results, options.transform, options.baseUrl);
       }
 
       // Return as T[] if no transform (assumes T extends string when no transform)
@@ -1139,9 +1139,10 @@ export class HtmlParserService {
   extractStructured<T = Record<string, any>>(
     html: string,
     schema: ExtractionSchema<T>,
-    options?: { verbose?: boolean },
+    options?: { verbose?: boolean; baseUrl?: string },
   ): T {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+    const baseUrl = options?.baseUrl;
     const result: Record<string, any> = {};
 
     if (verbose) {
@@ -1186,7 +1187,7 @@ export class HtmlParserService {
             // Apply transformation if provided
             const transform = config.transform;
             if (transform) {
-              value = this.applyTransform(value, transform);
+              value = this.applyTransform(value, transform, baseUrl);
             }
           } else {
             // Use extractSingle for single value fields
@@ -1216,7 +1217,7 @@ export class HtmlParserService {
             }
             // Apply transformation if provided
             if (value && config.transform) {
-              value = this.applyTransform(value, config.transform);
+              value = this.applyTransform(value, config.transform, baseUrl);
             }
           }
 
@@ -1330,9 +1331,10 @@ export class HtmlParserService {
     containerSelector: string,
     schema: ExtractionSchema<T>,
     containerType: 'xpath' | 'css' = 'xpath',
-    options?: { verbose?: boolean },
+    options?: { verbose?: boolean; baseUrl?: string },
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+    const baseUrl = options?.baseUrl;
     const results: T[] = [];
 
     if (verbose) {
@@ -1376,6 +1378,7 @@ export class HtmlParserService {
         const containerHTML = this.getElementHTML(container);
         const item = this.extractStructured<T>(containerHTML, schema, {
           verbose,
+          baseUrl,
         });
         results.push(item);
 
@@ -1892,9 +1895,30 @@ export class HtmlParserService {
   }
 
   /**
-   * Apply a transform (function, object with transform, class constructor, or array of these) to a value or array of values.
+   * Extract the origin (protocol + hostname + port) from a URL
+   * 
+   * @param url - Full URL string
+   * @returns Origin string (e.g., "https://example.com")
+   * 
+   * @example
+   * ```typescript
+   * const origin = parser.getOrigin('https://www.bmw-sg.com/forums/forums/introduction-greetings.24/page-5');
+   * // Result: "https://www.bmw-sg.com"
+   * ```
    */
-  private applyTransform(value: any, transform: any): any {
+  getOrigin(url: string): string {
+    try {
+      return new URL(url).origin;
+    } catch (error) {
+      throw new Error(`Invalid URL provided to getOrigin: ${url}`);
+    }
+  }
+
+  /**
+   * Apply a transform (function, object with transform, class constructor, or array of these) to a value or array of values.
+   * Supports pipe classes that need baseUrl context and properly chains transform outputs as inputs to next transform.
+   */
+  private applyTransform(value: any, transform: any, baseUrl?: string): any {
     if (!transform) return value;
 
     // Helper to get text content from DOM element
@@ -1913,35 +1937,70 @@ export class HtmlParserService {
       return (
         typeof t === 'function' &&
         t.prototype &&
-        t.prototype.constructor === t &&
-        Object.getOwnPropertyNames(t.prototype).includes('transform')
+        t.prototype.constructor === t
       );
     };
 
-    const executeTransform = (val: any, t: any): any => {
+    const isPipeClass = (t: any) => {
+      return (
+        isClass(t) &&
+        (Object.getOwnPropertyNames(t.prototype).includes('transform') ||
+         Object.getOwnPropertyNames(t.prototype).includes('exec'))
+      );
+    };
+
+    const executeTransform = (val: any, t: any, currentBaseUrl?: string): any => {
       val = toText(val); // Always convert to string if possible before transform
-      if (typeof t === 'function' && !isClass(t)) return t(val);
-      if (isClass(t)) {
+      
+      // Handle regular functions
+      if (typeof t === 'function' && !isClass(t)) {
+        return t(val);
+      }
+      
+      // Handle pipe classes (like ParseAsURLPipe, QueryAppendPipe, etc.)
+      if (isPipeClass(t)) {
         const instance = new t();
-        if (typeof instance.transform === 'function')
+        
+        // Set baseUrl if the instance supports it and we have one
+        if (currentBaseUrl && ('baseUrl' in instance || instance.hasOwnProperty('baseUrl'))) {
+          instance.baseUrl = currentBaseUrl;
+        }
+        
+        // Try exec method first (forum-crawler style), then transform method
+        if (typeof instance.exec === 'function') {
+          return instance.exec(val);
+        } else if (typeof instance.transform === 'function') {
           return instance.transform(val);
+        }
+        
         return val;
       }
+      
+      // Handle objects with transform method
       if (t && typeof t === 'object' && typeof t.transform === 'function') {
+        // Set baseUrl if the object supports it and we have one
+        if (currentBaseUrl && ('baseUrl' in t || t.hasOwnProperty('baseUrl'))) {
+          t.baseUrl = currentBaseUrl;
+        }
         return t.transform(val);
       }
+      
       return val;
     };
 
-    const applyToValue = (val: any, transforms: any): any => {
+    const applyToValue = (val: any, transforms: any, currentBaseUrl?: string): any => {
       if (Array.isArray(transforms)) {
-        return transforms.reduce((acc, t) => executeTransform(acc, t), val);
+        // Chain transforms: output of one becomes input of next, maintaining baseUrl context
+        return transforms.reduce((acc, t) => {
+          const result = executeTransform(acc, t, currentBaseUrl);
+          return result;
+        }, val);
       }
-      return executeTransform(val, transforms);
+      return executeTransform(val, transforms, currentBaseUrl);
     };
 
     return Array.isArray(value)
-      ? value.map((v) => applyToValue(v, transform))
-      : applyToValue(value, transform);
+      ? value.map((v) => applyToValue(v, transform, baseUrl))
+      : applyToValue(value, transform, baseUrl);
   }
 }

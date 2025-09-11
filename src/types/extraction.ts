@@ -1,5 +1,5 @@
 export type TransformFunction = (value: any) => any;
-export type TransformObject = { transform: (value: any) => any };
+export type TransformObject = { transform: (value: any) => any } | { exec: (value: any) => any };
 export type TransformClass = new (...args: any[]) => TransformObject;
 export type TransformType =
   | TransformFunction
@@ -73,6 +73,10 @@ export interface ExtractionField<T = any> {
 
 export interface ExtractionOptions<T = any> {
   verbose?: boolean;
+  /**
+   * Base URL for resolving relative URLs in transform pipes (e.g., ParseAsURLPipe)
+   */
+  baseUrl?: string;
   /**
    * Transform to apply to the extracted value. Can be:
    * - a function (value: string) => T
