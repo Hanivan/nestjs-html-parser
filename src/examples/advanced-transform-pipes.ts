@@ -13,7 +13,7 @@ import { ExtractionSchema, HtmlParserService } from '../';
 class ParseAsURLPipe {
   baseUrl?: string;
 
-  exec(url: string): string {
+  transform(url: string): string {
     if (!this.baseUrl) {
       throw new Error('BaseURL is required for ParseAsURLPipe');
     }
@@ -26,9 +26,9 @@ class ParseAsURLPipe {
 }
 
 class QueryAppendPipe {
-  constructor(public queryParams: Record<string, string> = {}) {}
+  queryParams: Record<string, string> = {};
 
-  exec(url: string): string {
+  transform(url: string): string {
     try {
       const urlObj = new URL(url);
       Object.entries(this.queryParams).forEach(([key, value]) => {
@@ -44,14 +44,11 @@ class QueryAppendPipe {
 class RegexReplacePipe {
   type = 'regex-replace';
   baseUrl?: string;
-  
-  constructor(
-    public regex: string,
-    public textReplacement: string,
-    public flag: string = 'g'
-  ) {}
+  regex: string = '';
+  textReplacement: string = '';
+  flag: string = 'g';
 
-  exec(val: string): string {
+  transform(val: string): string {
     if (typeof val === 'string') {
       const flag = Array.isArray(this.flag) ? this.flag.join(',') : this.flag;
       const result = val.replace(
@@ -66,7 +63,7 @@ class RegexReplacePipe {
 }
 
 class NumberNormalizePipe {
-  exec(numString: string): number {
+  transform(numString: string): number {
     if (typeof numString !== 'string') {
       return numString;
     }
@@ -85,7 +82,7 @@ class NumberNormalizePipe {
 }
 
 class DateFormatPipe {
-  exec(dateString: string): number {
+  transform(dateString: string): number {
     // Simple date parser that converts to Unix timestamp
     const date = new Date(dateString);
     return isNaN(date.getTime()) ? Date.now() / 1000 : date.getTime() / 1000;
@@ -151,15 +148,15 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
       attribute: 'href',
       // This is the key improvement - pipe array with baseUrl context!
       transform: [
-        ParseAsURLPipe, // Converts relative URL to absolute URL
-        new QueryAppendPipe({ utm_source: 'parser', ref: 'demo' }) // Adds tracking parameters
+        { class: ParseAsURLPipe }, // Converts relative URL to absolute URL
+        { class: QueryAppendPipe, payload: { queryParams: { utm_source: 'parser', ref: 'demo' } } } // Adds tracking parameters
       ]
     },
     author: {
       selector: './/div[@class="author"]/text()',
       type: 'xpath',
       transform: [
-        new RegexReplacePipe('^By: ', '', 'i'), // Remove "By: " prefix
+        { class: RegexReplacePipe, payload: { regex: '^By: ', textReplacement: '', flag: 'i' } }, // Remove "By: " prefix
         (author: string) => author.trim() // Additional cleanup
       ]
     },
@@ -172,7 +169,7 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
           const match = stats.match(/Replies:\s*(\d+)/);
           return match ? match[1] : '0';
         },
-        NumberNormalizePipe // Convert to number (handles 1k, 1.2k, etc.)
+        { class: NumberNormalizePipe } // Convert to number (handles 1k, 1.2k, etc.)
       ]
     },
     views: {
@@ -184,15 +181,15 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
           const match = stats.match(/Views:\s*([\d\.k]+)/);
           return match ? match[1] : '0';
         },
-        NumberNormalizePipe // Convert to number (handles 1k, 1.2k, etc.)
+        { class: NumberNormalizePipe } // Convert to number (handles 1k, 1.2k, etc.)
       ]
     },
     lastPost: {
       selector: './/div[@class="last-post"]/text()',
       type: 'xpath',
       transform: [
-        new RegexReplacePipe('Last post: (.+)', '$1'), // Extract date string
-        DateFormatPipe // Convert to Unix timestamp
+        { class: RegexReplacePipe, payload: { regex: 'Last post: (.+)', textReplacement: '$1' } }, // Extract date string
+        { class: DateFormatPipe } // Convert to Unix timestamp
       ]
     }
   };
@@ -255,8 +252,8 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
       {
         baseUrl: 'https://example.com',
         transform: [
-          ParseAsURLPipe,
-          new QueryAppendPipe({ source: 'test' })
+          { class: ParseAsURLPipe },
+          { class: QueryAppendPipe, payload: { queryParams: { source: 'test' } } }
         ]
       }
     );
@@ -278,8 +275,8 @@ async function demonstrateAdvancedTransformPipes(verbose = false): Promise<void>
       {
         baseUrl: 'https://example.com',
         transform: [
-          ParseAsURLPipe,
-          new QueryAppendPipe({ batch: 'multi' })
+          { class: ParseAsURLPipe },
+          { class: QueryAppendPipe, payload: { queryParams: { batch: 'multi' } } }
         ]
       }
     );
@@ -351,8 +348,8 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
       type: 'xpath',
       attribute: 'href',
       transform: [
-        ParseAsURLPipe,
-        new QueryAppendPipe({ category: 'electronics', source: 'listing' })
+        { class: ParseAsURLPipe },
+        { class: QueryAppendPipe, payload: { queryParams: { category: 'electronics', source: 'listing' } } }
       ]
     },
     price: {
@@ -371,7 +368,7 @@ async function demonstrateProductTransformPipes(verbose = false): Promise<void> 
       selector: './/div[@class="rating"]/text()',
       type: 'xpath',
       transform: [
-        new RegexReplacePipe('([\\d\\.]+) stars.*', '$1'),
+        { class: RegexReplacePipe, payload: { regex: '([\\d\\.]+) stars.*', textReplacement: '$1' } },
         (rating: string) => parseFloat(rating)
       ]
     }

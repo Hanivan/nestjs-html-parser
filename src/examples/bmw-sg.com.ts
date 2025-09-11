@@ -147,9 +147,6 @@ const payload = {
     countryCode: 'sg',
     numItterate: 4,
     numRetry: 0,
-    jobID: '5d2f39e7-5013-4148-897c-7f9865c6171c',
-    description:
-      'scraping data from https://www.bmw-sg.com/forums/forums/introduction-greetings.24/ (902) on interval 45',
     origin: 'bmw-sg.com',
     mediaId: 902,
     timeout: 45,
@@ -163,7 +160,7 @@ class ParseAsUrlPipe {
   type = 'parse-as-url';
   baseUrl?: string;
 
-  exec(url: string): string {
+  transform(url: string): string {
     if (!this.baseUrl) {
       throw new Error('BaseURL is required for ParseAsUrlPipe');
     }
@@ -178,14 +175,11 @@ class ParseAsUrlPipe {
 class RegexReplacePipe {
   type = 'regex-replace';
   baseUrl?: string;
+  regex: string = '';
+  textReplacement: string = '';
+  flag: string = 'g';
 
-  constructor(
-    public regex: string,
-    public textReplacement: string,
-    public flag: string = 'g',
-  ) {}
-
-  exec(val: string): string {
+  transform(val: string): string {
     if (typeof val === 'string') {
       const flag = Array.isArray(this.flag) ? this.flag.join(',') : this.flag;
       const result = val.replace(
@@ -202,13 +196,10 @@ class RegexReplacePipe {
 class RegexExtractionPipe {
   type = 'regex-extraction';
   baseUrl?: string;
+  regex: string = '';
+  flag: string = 'g';
 
-  constructor(
-    public regex: string,
-    public flag: string = 'g',
-  ) {}
-
-  exec(val: string): string {
+  transform(val: string): string {
     if (typeof val === 'string') {
       const flag = Array.isArray(this.flag) ? this.flag.join(',') : this.flag;
       const match = val.match(new RegExp(this.regex, flag));
@@ -222,10 +213,9 @@ class RegexExtractionPipe {
 class QueryRemoverPipe {
   type = 'query-remover';
   baseUrl?: string;
+  removed: string[] = [];
 
-  constructor(public removed: string[] = []) {}
-
-  exec(url: string): string {
+  transform(url: string): string {
     try {
       const urlObj = new URL(url);
       this.removed.forEach((param) => {
@@ -242,7 +232,7 @@ class NumNormalizePipe {
   type = 'num-normalize';
   baseUrl?: string;
 
-  exec(numString: string): number {
+  transform(numString: string): number {
     if (typeof numString !== 'string') {
       return numString;
     }
@@ -263,20 +253,28 @@ class NumNormalizePipe {
 class DateFormatPipe {
   type = 'date-format';
   baseUrl?: string;
+  locale: string = 'en';
+  format: string = 'YYYY-MM-DDTHH:mm:ssZZ';
+  timezone: string = 'Asia/Singapore';
 
-  constructor(
-    public locale: string = 'en',
-    public format: string = 'YYYY-MM-DDTHH:mm:ssZZ',
-    public timezone: string = 'Asia/Singapore',
-  ) {}
-
-  exec(dateString: string): number {
+  transform(dateString: string): number {
     // Simple date parser that converts to Unix timestamp
     if (typeof dateString !== 'string' || !dateString.trim()) {
       return Date.now() / 1000;
     }
     const date = new Date(dateString);
     return isNaN(date.getTime()) ? Date.now() / 1000 : date.getTime() / 1000;
+  }
+}
+
+class ThreadIdExtractorPipe {
+  type = 'thread-id-extractor';
+  baseUrl?: string;
+
+  transform(url: string): string {
+    if (typeof url !== 'string') return url;
+    const match = url.match(/\.(\d+)\//);
+    return match ? match[1] : url;
   }
 }
 
@@ -298,6 +296,74 @@ interface ForumReply {
   replyText: string[];
   urlReply: string;
 }
+
+// Mapping function to convert raw pipes to object-based transform format (DRY principle)
+const mappingTransform = (rawPipes: any[], withItsPayload?: any): any[] => {
+  if (!rawPipes || !Array.isArray(rawPipes)) return [];
+
+  return rawPipes.map((pipe) => {
+    // Handle different pipe types based on forum-crawler CleanerType enum
+    switch (pipe.type) {
+      case 'parse-as-url':
+        return {
+          class: ParseAsUrlPipe,
+        };
+
+      case 'query-remover':
+        return {
+          class: QueryRemoverPipe,
+          payload: {
+            removed: pipe.removed || withItsPayload?.removed || [],
+          },
+        };
+
+      case 'num-normalize':
+        return {
+          class: NumNormalizePipe,
+        };
+
+      case 'date-format':
+        return {
+          class: DateFormatPipe,
+          payload: {
+            locale: pipe.locale || 'en',
+            format: pipe.format || 'YYYY-MM-DDTHH:mm:ssZZ',
+            timezone: pipe.timezone || 'Asia/Singapore',
+          },
+        };
+
+      case 'regex-replace':
+        return {
+          class: RegexReplacePipe,
+          payload: {
+            regex: pipe.regex || '',
+            textReplacement: pipe.textReplacement || '',
+            flag: pipe.flag || 'g',
+          },
+        };
+
+      case 'regex-extraction':
+        return {
+          class: RegexExtractionPipe,
+          payload: {
+            regex: pipe.regex || '',
+            flag: pipe.flag || 'g',
+          },
+        };
+
+      default:
+        console.warn(`Unknown pipe type: ${pipe.type}`);
+        // Return a no-op transform instead of null
+        return {
+          class: class NoOpPipe {
+            transform(val: any) {
+              return val;
+            }
+          },
+        };
+    }
+  }); // Don't filter, always return valid transforms
+};
 
 async function scrapeBmwSgForum(verbose = false): Promise<void> {
   const parser = new HtmlParserService();
@@ -343,12 +409,7 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
       threadId: {
         selector: './/div[@class="structItem-title"]/a/@href',
         type: 'xpath',
-        transform: [
-          (url: string) => {
-            const match = url.match(/\.(\d+)\//);
-            return match ? match[1] : url;
-          },
-        ],
+        transform: [{ class: ThreadIdExtractorPipe }],
       },
       // THREAD_TITLE_PATTERN
       threadTitle: {
@@ -364,11 +425,12 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
           './/div[@class="structItem-title"]/a/@href',
         type: 'xpath',
         transform: [
-          ParseAsUrlPipe, // Convert to absolute URL
-          new QueryRemoverPipe(
-            (getPatternByKey('THREAD_LINK_PATTERN')?.pipe?.[0] as any)
-              ?.removed || ['s'],
-          ), // Remove query parameters from payload
+          { class: ParseAsUrlPipe }, // Convert to absolute URL
+          ...mappingTransform(
+            getPatternByKey('THREAD_LINK_PATTERN')?.pipe || [
+              { type: 'query-remover', removed: ['s'] },
+            ],
+          ),
         ],
       },
       // THREAD_REPLIES_PATTERN - From structItem-cell--meta
@@ -376,34 +438,30 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
         selector:
           './/div[contains(@class,"structItem-cell--meta")]//dl[dt="Replies"]/dd/text()',
         type: 'xpath',
-        transform: [
-          NumNormalizePipe, // Normalize numbers (1k, 1.2k, etc.)
-        ],
+        transform: mappingTransform([{ type: 'num-normalize' }]),
       },
       // THREAD_VIEWS_PATTERN - From structItem-cell--meta
       threadViews: {
         selector:
           './/div[contains(@class,"structItem-cell--meta")]//dl[dt="Views"]/dd/text()',
         type: 'xpath',
-        transform: [
-          NumNormalizePipe, // Normalize numbers (1k, 1.2k, etc.)
-        ],
+        transform: mappingTransform([{ type: 'num-normalize' }]),
       },
       // THREAD_LAST_POST_PATTERN - From structItem-cell--latest (updated for real HTML structure)
       threadLastPost: {
         selector:
           './/div[contains(@class,"structItem-cell--latest")]//time/@datetime',
         type: 'xpath',
-        transform: [
-          new DateFormatPipe(
-            (getPatternByKey('THREAD_LAST_POST_PATTERN')?.pipe?.[0] as any)
-              ?.locale || 'en',
-            (getPatternByKey('THREAD_LAST_POST_PATTERN')?.pipe?.[0] as any)
-              ?.format || 'YYYY-MM-DDTHH:mm:ssZZ',
-            (getPatternByKey('THREAD_LAST_POST_PATTERN')?.pipe?.[0] as any)
-              ?.timezone || 'Asia/Singapore',
-          ),
-        ],
+        transform: mappingTransform(
+          getPatternByKey('THREAD_LAST_POST_PATTERN')?.pipe || [
+            {
+              type: 'date-format',
+              locale: 'en',
+              format: 'YYYY-MM-DDTHH:mm:ssZZ',
+              timezone: 'Asia/Singapore',
+            },
+          ],
+        ),
       },
     };
 
@@ -461,30 +519,31 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
           getReplyPatternByKey('replyDate')?.pattern ||
           './/time[@datetime]/@datetime',
         type: 'xpath',
-        transform: [
-          new DateFormatPipe(
-            (getReplyPatternByKey('replyDate')?.pipe?.[0] as any)?.locale ||
-              'en',
-            (getReplyPatternByKey('replyDate')?.pipe?.[0] as any)?.format ||
-              'YYYY-MM-DDTHH:mm:ssZZ',
-            (getReplyPatternByKey('replyDate')?.pipe?.[0] as any)?.timezone ||
-              'Asia/Singapore',
-          ),
-        ],
+        transform: mappingTransform(
+          getReplyPatternByKey('replyDate')?.pipe || [
+            {
+              type: 'date-format',
+              locale: 'en',
+              format: 'YYYY-MM-DDTHH:mm:ssZZ',
+              timezone: 'Asia/Singapore',
+            },
+          ],
+        ),
       },
       // Reply ID
       replyId: {
         selector: getReplyPatternByKey('replyId')?.pattern || './@data-content',
         type: 'xpath',
-        transform: [
-          new RegexReplacePipe(
-            (getReplyPatternByKey('replyId')?.pipe?.[0] as any)?.regex ||
-              '^post-',
-            (getReplyPatternByKey('replyId')?.pipe?.[0] as any)
-              ?.textReplacement || '',
-            (getReplyPatternByKey('replyId')?.pipe?.[0] as any)?.flag || 'g',
-          ),
-        ],
+        transform: mappingTransform(
+          getReplyPatternByKey('replyId')?.pipe || [
+            {
+              type: 'regex-replace',
+              regex: '^post-',
+              textReplacement: '',
+              flag: 'g',
+            },
+          ],
+        ),
       },
       // Reply HTML
       replyHtml: {
@@ -508,9 +567,9 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
           getReplyPatternByKey('urlReply')?.pattern ||
           './/div[contains(@class,"message-attribution-opposite")]//a/@href',
         type: 'xpath',
-        transform: [
-          ParseAsUrlPipe, // Convert relative URL to absolute
-        ],
+        transform: mappingTransform(
+          getReplyPatternByKey('urlReply')?.pipe || [{ type: 'parse-as-url' }],
+        ),
       },
     };
 
@@ -576,7 +635,7 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
       undefined,
       {
         baseUrl,
-        transform: [ParseAsUrlPipe],
+        transform: mappingTransform([{ type: 'parse-as-url' }]),
       },
     );
 
@@ -627,15 +686,17 @@ async function scrapeBmwSgForum(verbose = false): Promise<void> {
   }
 }
 
-// Export pipe classes and main function
+// Export pipe classes, mapping function, and main function
 export {
   DateFormatPipe,
+  mappingTransform,
   NumNormalizePipe,
   ParseAsUrlPipe,
   QueryRemoverPipe,
   RegexExtractionPipe,
   RegexReplacePipe,
   scrapeBmwSgForum,
+  ThreadIdExtractorPipe,
 };
 
 // Run the scraper if this file is executed directly

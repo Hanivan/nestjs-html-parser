@@ -321,7 +321,7 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
       }
     }
     class SuffixPipe {
-      constructor(private suffix: string) {}
+      suffix: string = '';
       transform(value: string) {
         return value + this.suffix;
       }
@@ -334,8 +334,8 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
         type: 'xpath' as 'xpath',
         transform: [
           (title: string) => title.trim(),
-          UppercasePipe, // <-- class, will be instantiated automatically
-          new SuffixPipe(' [ADVANCED]'), // <-- instance, used as is
+          { class: UppercasePipe }, // <-- class, will be instantiated automatically
+          { class: SuffixPipe, payload: { suffix: ' [ADVANCED]' } }, // <-- object-based configuration
         ],
       },
       episode: {
@@ -348,7 +348,7 @@ async function demonstrateOtakudesuParser(verbose = false): Promise<void> {
             if (!match) match = text.match(/(\d+)/);
             return match ? parseInt(match[1]) : 0;
           },
-          new SuffixPipe(' (ep)'), // <-- instance, used as is
+          { class: SuffixPipe, payload: { suffix: ' (ep)' } }, // <-- object-based configuration
         ],
       },
     };

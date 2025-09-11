@@ -578,7 +578,7 @@ export class HtmlParserService {
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
-    options?: ExtractionOptions<T>,
+    options?: ExtractionOptions,
   ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -673,7 +673,7 @@ export class HtmlParserService {
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
     attribute?: string,
-    options?: ExtractionOptions<T>,
+    options?: ExtractionOptions,
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -773,7 +773,7 @@ export class HtmlParserService {
     html: string,
     selector: string,
     type: 'xpath' | 'css' = 'xpath',
-    options?: ExtractionOptions<T>,
+    options?: ExtractionOptions,
   ): T | null {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -851,7 +851,7 @@ export class HtmlParserService {
     selector: string,
     attribute: string,
     type: 'xpath' | 'css' = 'xpath',
-    options?: ExtractionOptions<T>,
+    options?: ExtractionOptions,
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
 
@@ -1915,8 +1915,8 @@ export class HtmlParserService {
   }
 
   /**
-   * Apply a transform (function, object with transform, class constructor, or array of these) to a value or array of values.
-   * Supports pipe classes that need baseUrl context and properly chains transform outputs as inputs to next transform.
+   * Apply a transform (object with class and payload, or array of these) to a value or array of values.
+   * Supports pipe classes with transform method that need baseUrl context and properly chains transform outputs as inputs to next transform.
    */
   private applyTransform(value: any, transform: any, baseUrl?: string): any {
     if (!transform) return value;
@@ -1944,45 +1944,38 @@ export class HtmlParserService {
     const isPipeClass = (t: any) => {
       return (
         isClass(t) &&
-        (Object.getOwnPropertyNames(t.prototype).includes('transform') ||
-         Object.getOwnPropertyNames(t.prototype).includes('exec'))
+        Object.getOwnPropertyNames(t.prototype).includes('transform')
       );
     };
 
     const executeTransform = (val: any, t: any, currentBaseUrl?: string): any => {
       val = toText(val); // Always convert to string if possible before transform
       
-      // Handle regular functions
-      if (typeof t === 'function' && !isClass(t)) {
+      // Handle function format: (value) => transformedValue
+      if (typeof t === 'function') {
         return t(val);
       }
       
-      // Handle pipe classes (like ParseAsURLPipe, QueryAppendPipe, etc.)
-      if (isPipeClass(t)) {
-        const instance = new t();
+      // Handle object format: { class: SomeClass, payload?: {...} }
+      if (t && typeof t === 'object' && t.class && isPipeClass(t.class)) {
+        const instance = new t.class();
+        
+        // Apply payload configuration if provided
+        if (t.payload && typeof t.payload === 'object') {
+          Object.assign(instance, t.payload);
+        }
         
         // Set baseUrl if the instance supports it and we have one
         if (currentBaseUrl && ('baseUrl' in instance || instance.hasOwnProperty('baseUrl'))) {
           instance.baseUrl = currentBaseUrl;
         }
         
-        // Try exec method first (forum-crawler style), then transform method
-        if (typeof instance.exec === 'function') {
-          return instance.exec(val);
-        } else if (typeof instance.transform === 'function') {
+        // Call transform method
+        if (typeof instance.transform === 'function') {
           return instance.transform(val);
         }
         
         return val;
-      }
-      
-      // Handle objects with transform method
-      if (t && typeof t === 'object' && typeof t.transform === 'function') {
-        // Set baseUrl if the object supports it and we have one
-        if (currentBaseUrl && ('baseUrl' in t || t.hasOwnProperty('baseUrl'))) {
-          t.baseUrl = currentBaseUrl;
-        }
-        return t.transform(val);
       }
       
       return val;
