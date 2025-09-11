@@ -1,11 +1,9 @@
-export type TransformFunction = (value: any) => any;
-export type TransformObject = { transform: (value: any) => any };
-export type TransformClass = new (...args: any[]) => TransformObject;
-export type TransformType =
-  | TransformFunction
-  | TransformObject
-  | TransformClass
-  | Array<TransformFunction | TransformObject | TransformClass>;
+export type TransformPipeConfig<T = any> = {
+  class: new (...args: any[]) => { transform: (value: any) => any };
+  payload?: Partial<T>;
+};
+
+export type TransformType = TransformPipeConfig | ((value: any) => any) | Array<TransformPipeConfig | ((value: any) => any)>;
 
 export interface ExtractionSchema<T = Record<string, any>> {
   [key: string]: {
@@ -22,11 +20,9 @@ export interface ExtractionSchema<T = Record<string, any>> {
      */
     attribute?: string;
     /**
-     * Transform to apply to the extracted value. Can be:
-     * - a function (value: string) => any
-     * - an object with a transform(value: any) method
-     * - a class constructor with a transform method
-     * - an array of such functions/objects/classes (applied in order)
+     * Transform to apply to the extracted value. Must be:
+     * - an object with { class: PipeClass, payload?: {...} }
+     * - an array of such objects (applied in order)
      */
     transform?: TransformType;
     /**
@@ -40,7 +36,7 @@ export interface ExtractionSchema<T = Record<string, any>> {
   };
 }
 
-export interface ExtractionField<T = any> {
+export interface ExtractionField {
   /**
    * CSS selector or XPath expression to locate elements
    */
@@ -54,11 +50,9 @@ export interface ExtractionField<T = any> {
    */
   attribute?: string;
   /**
-   * Transform to apply to the extracted value. Can be:
-   * - a function (value: string) => T
-   * - an object with a transform(value: any) => T method
-   * - a class constructor with a transform method
-   * - an array of such functions/objects/classes (applied in order)
+   * Transform to apply to the extracted value. Must be:
+   * - an object with { class: PipeClass, payload?: {...} }
+   * - an array of such objects (applied in order)
    */
   transform?: TransformType;
   /**
@@ -71,14 +65,16 @@ export interface ExtractionField<T = any> {
   raw?: boolean;
 }
 
-export interface ExtractionOptions<T = any> {
+export interface ExtractionOptions {
   verbose?: boolean;
   /**
-   * Transform to apply to the extracted value. Can be:
-   * - a function (value: string) => T
-   * - an object with a transform(value: any) => T method
-   * - a class constructor with a transform method
-   * - an array of such functions/objects/classes (applied in order)
+   * Base URL for resolving relative URLs in transform pipes (e.g., ParseAsURLPipe)
+   */
+  baseUrl?: string;
+  /**
+   * Transform to apply to the extracted value. Must be:
+   * - an object with { class: PipeClass, payload?: {...} }
+   * - an array of such objects (applied in order)
    */
   transform?: TransformType;
 }
