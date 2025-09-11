@@ -43,3 +43,9 @@ export * from './extraction';
 
 // Options types
 export * from './options';
+
+// Pagination result interface
+export interface PaginationPage {
+  href: string;
+  text: string;
+}

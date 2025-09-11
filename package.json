@@ -47,6 +47,7 @@
     "demo:typed": "ts-node src/examples/typed-extraction.ts",
     "demo:transform-pipes": "ts-node src/examples/advanced-transform-pipes.ts",
     "demo:bmw-sg": "ts-node src/examples/bmw-sg.com.ts",
+    "demo:pagination": "ts-node src/examples/pagination-validation.ts",
     "demo:hackernews:verbose": "ts-node src/examples/news.ycombinator.com.ts --verbose",
     "demo:watanoc:verbose": "ts-node src/examples/watanoc.com.ts --verbose",
     "demo:otakudesu:verbose": "ts-node src/examples/otakudesu.cloud.ts --verbose",
@@ -57,7 +58,8 @@
     "demo:typed:verbose": "ts-node src/examples/typed-extraction.ts --verbose",
     "demo:transform-pipes:verbose": "ts-node src/examples/advanced-transform-pipes.ts --verbose",
     "demo:bmw-sg:verbose": "ts-node src/examples/bmw-sg.com.ts --verbose",
-    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:otakudesu && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response && echo '\n\n' && yarn demo:ssl && echo '\n\n' && yarn demo:typed && echo '\n\n' && yarn demo:transform-pipes"
+    "demo:pagination:verbose": "ts-node src/examples/pagination-validation.ts --verbose",
+    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:otakudesu && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response && echo '\n\n' && yarn demo:ssl && echo '\n\n' && yarn demo:typed && echo '\n\n' && yarn demo:transform-pipes && echo '\n\n' && yarn demo:pagination"
   },
   "dependencies": {
     "@ahmedrangel/rand-user-agent": "^2.0.23",
