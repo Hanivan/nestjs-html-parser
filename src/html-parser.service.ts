@@ -1896,71 +1896,97 @@ export class HtmlParserService {
   }
 
   /**
-   * Extract pagination data from HTML using a predefined schema
+   * Extract pagination data from HTML using a predefined or custom schema
    *
-   * This method provides a convenient way to extract pagination information without
-   * needing to define a custom schema. It automatically uses a standard pagination
-   * schema that extracts href and text from pagination elements.
+   * This method provides a convenient way to extract pagination information. It can use
+   * either a default pagination schema or a custom schema provided by the user. When no
+   * custom schema is provided, it extracts all links from the container selector.
    *
    * @param html - HTML content to parse
-   * @param containerSelector - XPath or CSS selector to find pagination container elements
+   * @param containerSelector - XPath or CSS selector to find the container element(s)
    * @param containerType - Type of container selector: 'xpath' (default) or 'css'
    * @param options - Parsing options
    * @param options.verbose - Enable verbose logging for debugging
    * @param options.baseUrl - Base URL for relative link resolution
+   * @param options.schema - Optional custom schema for extraction. If not provided, extracts all links from container
+   * @param options.linkSelector - Optional selector to find links within container (default: './/a' for xpath, 'a' for css)
    *
-   * @returns Array of pagination page objects with href and text properties
+   * @returns Array of pagination objects with href and text properties (or custom schema structure)
    *
    * @example
    * ```typescript
    * const html = `
-   *   <ul class="pageNav-main">
-   *     <li class="pageNav-page"><a href="/page-1">1</a></li>
-   *     <li class="pageNav-page pageNav-page--current"><a href="/page-2">2</a></li>
-   *     <li class="pageNav-page"><a href="/page-3">3</a></li>
-   *   </ul>
+   *   <div class="pageNav">
+   *     <a href="/page-4" class="pageNav-jump">Prev</a>
+   *     <ul class="pageNav-main">
+   *       <li><a href="/page-1">1</a></li>
+   *       <li><a href="/page-2">2</a></li>
+   *     </ul>
+   *     <a href="/page-6" class="pageNav-jump">Next</a>
+   *   </div>
    * `;
    *
-   * // Extract pagination using XPath
+   * // Extract all links from container
+   * const allLinks = parser.extractPagination(html, '//div[@class="pageNav"]');
+   * // Result: [
+   * //   { href: "/page-4", text: "Prev" },
+   * //   { href: "/page-1", text: "1" },
+   * //   { href: "/page-2", text: "2" },
+   * //   { href: "/page-6", text: "Next" }
+   * // ]
+   *
+   * // Extract specific pagination items only
    * const pages = parser.extractPagination(
    *   html,
-   *   "//li[contains(@class, 'pageNav-page')]"
+   *   "//li",
+   *   'xpath'
    * );
    * // Result: [
    * //   { href: "/page-1", text: "1" },
-   * //   { href: "/page-2", text: "2" },
-   * //   { href: "/page-3", text: "3" }
+   * //   { href: "/page-2", text: "2" }
    * // ]
    *
-   * // With baseUrl for absolute URLs
-   * const pagesWithBase = parser.extractPagination(
+   * // With custom schema
+   * interface CustomPage {
+   *   url: string;
+   *   label: string;
+   *   isActive: boolean;
+   * }
+   *
+   * const customPages = parser.extractPagination<CustomPage>(
    *   html,
-   *   "//li[contains(@class, 'pageNav-page')]",
+   *   "//li",
    *   'xpath',
-   *   { baseUrl: 'https://example.com' }
-   * );
-   * // Result: [
-   * //   { href: "https://example.com/page-1", text: "1" },
-   * //   { href: "https://example.com/page-2", text: "2" },
-   * //   { href: "https://example.com/page-3", text: "3" }
-   * // ]
-   *
-   * // Using CSS selector
-   * const pagesCSS = parser.extractPagination(
-   *   html,
-   *   'li.pageNav-page',
-   *   'css'
+   *   {
+   *     schema: {
+   *       url: { selector: './/a', type: 'xpath', attribute: 'href' },
+   *       label: { selector: './/a/text()', type: 'xpath' },
+   *       isActive: {
+   *         selector: '.',
+   *         type: 'xpath',
+   *         attribute: 'class',
+   *         transform: (cls: string) => cls?.includes('current') || false
+   *       }
+   *     }
+   *   }
    * );
    * ```
    */
-  extractPagination(
+  extractPagination<T = PaginationPage>(
     html: string,
     containerSelector: string,
     containerType: 'xpath' | 'css' = 'xpath',
-    options?: { verbose?: boolean; baseUrl?: string },
-  ): PaginationPage[] {
+    options?: { 
+      verbose?: boolean; 
+      baseUrl?: string;
+      schema?: ExtractionSchema<T>;
+      linkSelector?: string;
+    },
+  ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const baseUrl = options?.baseUrl;
+    const customSchema = options?.schema;
+    const linkSelector = options?.linkSelector || (containerType === 'xpath' ? './/a' : 'a');
 
     // Validate containerSelector
     if (!containerSelector || typeof containerSelector !== 'string') {
@@ -1977,45 +2003,113 @@ export class HtmlParserService {
       );
     }
 
-    // Define the pagination schema
-    const pageSchema: ExtractionSchema<PaginationPage> = {
-      href: {
-        selector: './/a',
-        type: 'xpath',
-        attribute: 'href',
-        transform: baseUrl ? (href: string) => {
-          if (!href) return href;
-          try {
-            // Handle relative URLs
-            if (href.startsWith('/') || !href.includes('://')) {
-              return new URL(href, baseUrl).toString();
-            }
-            return href;
-          } catch {
-            return href;
-          }
-        } : undefined,
-      },
-      text: {
-        selector: './/a/text()',
-        type: 'xpath'
-      }
-    };
-
     try {
-      const results = this.extractStructuredList<PaginationPage>(
-        html,
-        containerSelector,
-        pageSchema,
-        containerType,
-        { verbose, baseUrl }
-      );
+      let results: T[];
 
-      // Filter out invalid results (pages without href or text)
-      const validResults = results.filter(page => 
-        page.href && page.href.trim() !== '' && 
-        page.text && page.text.trim() !== ''
-      );
+      if (customSchema) {
+        // Use custom schema with extractStructuredList
+        results = this.extractStructuredList<T>(
+          html,
+          containerSelector,
+          customSchema,
+          containerType,
+          { verbose, baseUrl }
+        );
+      } else {
+        // Extract all links from the container directly
+        if (verbose) {
+          this.logWithLevel(
+            'debug',
+            `📎 Using default link extraction with selector: "${linkSelector}"`
+          );
+        }
+
+        // Get all links directly from the container
+        let linkElements: string[];
+        let linkTexts: string[];
+
+        if (containerType === 'xpath') {
+          // Use the container as the context and find all links within it
+          const containers = this.evaluateXPath(html, containerSelector, verbose);
+          const allLinks: { href: string; text: string }[] = [];
+
+          for (const container of containers) {
+            const containerHTML = this.getElementHTML(container);
+            
+            // Get all anchor elements first
+            const anchorElements = this.evaluateXPath(containerHTML, linkSelector, verbose);
+            
+            // Extract href and text from each anchor element individually
+            for (const anchorElement of anchorElements) {
+              const href = (anchorElement as any).getAttribute ? (anchorElement as any).getAttribute('href') : null;
+              const text = (anchorElement as any).textContent || (anchorElement as any).innerText || '';
+              
+              // Only include links that have both href and text
+              if (href && href.trim() !== '' && text && text.trim() !== '') {
+                allLinks.push({ 
+                  href: href.trim(), 
+                  text: text.trim() 
+                });
+              }
+            }
+          }
+
+          linkElements = allLinks.map(link => link.href);
+          linkTexts = allLinks.map(link => link.text);
+        } else {
+          // For CSS selectors, extract from the entire HTML
+          const $ = require('cheerio').load(html);
+          const container = $(containerSelector);
+          const links = container.find(linkSelector);
+          
+          linkElements = [];
+          linkTexts = [];
+          
+          links.each((_: number, element: any) => {
+            const $element = $(element);
+            const href = $element.attr('href');
+            const text = $element.text().trim();
+            if (href && text) {
+              linkElements.push(href);
+              linkTexts.push(text);
+            }
+          });
+        }
+
+        // Transform results to PaginationPage format and apply baseUrl if needed
+        const pageResults: PaginationPage[] = [];
+        for (let i = 0; i < Math.min(linkElements.length, linkTexts.length); i++) {
+          let href = linkElements[i];
+          const text = linkTexts[i];
+
+          // Apply baseUrl transformation if provided
+          if (baseUrl && href) {
+            try {
+              if (href.startsWith('/') || !href.includes('://')) {
+                href = new URL(href, baseUrl).toString();
+              }
+            } catch {
+              // Keep original href if URL construction fails
+            }
+          }
+
+          pageResults.push({ href, text } as PaginationPage);
+        }
+
+        results = pageResults as T[];
+      }
+
+      // Filter out invalid results (pages without required fields)
+      const validResults = results.filter(page => {
+        if (customSchema) {
+          // For custom schema, just check if the object has some content
+          return page && typeof page === 'object';
+        } else {
+          // For default pagination, check href and text
+          const p = page as unknown as PaginationPage;
+          return p.href && p.href.trim() !== '' && p.text && p.text.trim() !== '';
+        }
+      });
 
       if (verbose) {
         this.logWithLevel(
