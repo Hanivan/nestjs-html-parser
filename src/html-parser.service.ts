@@ -10,6 +10,7 @@ import {
   ExtractionSchema,
   HtmlFetchResponse,
   HtmlParserOptions,
+  PaginationPage,
   ProxyConfig,
 } from './types';
 
@@ -1891,6 +1892,144 @@ export class HtmlParserService {
       default:
         // Retry unknown errors by default
         return true;
+    }
+  }
+
+  /**
+   * Extract pagination data from HTML using a predefined schema
+   *
+   * This method provides a convenient way to extract pagination information without
+   * needing to define a custom schema. It automatically uses a standard pagination
+   * schema that extracts href and text from pagination elements.
+   *
+   * @param html - HTML content to parse
+   * @param containerSelector - XPath or CSS selector to find pagination container elements
+   * @param containerType - Type of container selector: 'xpath' (default) or 'css'
+   * @param options - Parsing options
+   * @param options.verbose - Enable verbose logging for debugging
+   * @param options.baseUrl - Base URL for relative link resolution
+   *
+   * @returns Array of pagination page objects with href and text properties
+   *
+   * @example
+   * ```typescript
+   * const html = `
+   *   <ul class="pageNav-main">
+   *     <li class="pageNav-page"><a href="/page-1">1</a></li>
+   *     <li class="pageNav-page pageNav-page--current"><a href="/page-2">2</a></li>
+   *     <li class="pageNav-page"><a href="/page-3">3</a></li>
+   *   </ul>
+   * `;
+   *
+   * // Extract pagination using XPath
+   * const pages = parser.extractPagination(
+   *   html,
+   *   "//li[contains(@class, 'pageNav-page')]"
+   * );
+   * // Result: [
+   * //   { href: "/page-1", text: "1" },
+   * //   { href: "/page-2", text: "2" },
+   * //   { href: "/page-3", text: "3" }
+   * // ]
+   *
+   * // With baseUrl for absolute URLs
+   * const pagesWithBase = parser.extractPagination(
+   *   html,
+   *   "//li[contains(@class, 'pageNav-page')]",
+   *   'xpath',
+   *   { baseUrl: 'https://example.com' }
+   * );
+   * // Result: [
+   * //   { href: "https://example.com/page-1", text: "1" },
+   * //   { href: "https://example.com/page-2", text: "2" },
+   * //   { href: "https://example.com/page-3", text: "3" }
+   * // ]
+   *
+   * // Using CSS selector
+   * const pagesCSS = parser.extractPagination(
+   *   html,
+   *   'li.pageNav-page',
+   *   'css'
+   * );
+   * ```
+   */
+  extractPagination(
+    html: string,
+    containerSelector: string,
+    containerType: 'xpath' | 'css' = 'xpath',
+    options?: { verbose?: boolean; baseUrl?: string },
+  ): PaginationPage[] {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+    const baseUrl = options?.baseUrl;
+
+    // Validate containerSelector
+    if (!containerSelector || typeof containerSelector !== 'string') {
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', `Invalid containerSelector provided: ${containerSelector}`);
+      }
+      return [];
+    }
+
+    if (verbose) {
+      this.logWithLevel(
+        'debug',
+        `🔍 extractPagination - Container: "${containerSelector}", Type: ${containerType}`,
+      );
+    }
+
+    // Define the pagination schema
+    const pageSchema: ExtractionSchema<PaginationPage> = {
+      href: {
+        selector: './/a',
+        type: 'xpath',
+        attribute: 'href',
+        transform: baseUrl ? (href: string) => {
+          if (!href) return href;
+          try {
+            // Handle relative URLs
+            if (href.startsWith('/') || !href.includes('://')) {
+              return new URL(href, baseUrl).toString();
+            }
+            return href;
+          } catch {
+            return href;
+          }
+        } : undefined,
+      },
+      text: {
+        selector: './/a/text()',
+        type: 'xpath'
+      }
+    };
+
+    try {
+      const results = this.extractStructuredList<PaginationPage>(
+        html,
+        containerSelector,
+        pageSchema,
+        containerType,
+        { verbose, baseUrl }
+      );
+
+      // Filter out invalid results (pages without href or text)
+      const validResults = results.filter(page => 
+        page.href && page.href.trim() !== '' && 
+        page.text && page.text.trim() !== ''
+      );
+
+      if (verbose) {
+        this.logWithLevel(
+          'debug',
+          `🎯 extractPagination completed: ${validResults.length} valid pages extracted`
+        );
+      }
+
+      return validResults;
+    } catch (error) {
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in extractPagination:', error);
+      }
+      return [];
     }
   }
 
