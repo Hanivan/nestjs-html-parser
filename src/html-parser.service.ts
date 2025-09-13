@@ -2162,6 +2162,7 @@ export class HtmlParserService {
    * @param options.baseUrl - Base URL for relative link resolution
    * @param options.schema - Optional custom schema for extraction. If not provided, extracts all links from container
    * @param options.linkSelector - Optional selector to find links within container (default: './/a' for xpath, 'a' for css)
+   * @param options.transform - Optional transformation function or pipe to apply to results (only used when no custom schema)
    *
    * @returns Array of pagination objects with href and text properties (or custom schema structure)
    *
@@ -2186,6 +2187,18 @@ export class HtmlParserService {
    * //   { href: "/page-2", text: "2" },
    * //   { href: "/page-6", text: "Next" }
    * // ]
+   *
+   * // With transform pipe
+   * const transformedPages = parser.extractPagination(
+   *   html,
+   *   '//div[@class="pageNav"]',
+   *   'xpath',
+   *   {
+   *     baseUrl: 'https://example.com',
+   *     transform: { class: PathAppendPipe, payload: { pathSegment: '/view' } }
+   *   }
+   * );
+   * // Result: URLs will have '/view' appended to the path
    *
    * // Extract specific pagination items only
    * const pages = parser.extractPagination(
@@ -2233,11 +2246,13 @@ export class HtmlParserService {
       baseUrl?: string;
       schema?: ExtractionSchema<T>;
       linkSelector?: string;
+      transform?: any;
     },
   ): T[] {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const baseUrl = options?.baseUrl;
     const customSchema = options?.schema;
+    const transform = options?.transform;
     const linkSelector =
       options?.linkSelector || (containerType === 'xpath' ? './/a' : 'a');
 
@@ -2370,6 +2385,11 @@ export class HtmlParserService {
         }
 
         results = pageResults as T[];
+
+        // Apply transform if provided and no custom schema
+        if (transform && !customSchema) {
+          results = this.applyTransform(results, transform, baseUrl);
+        }
       }
 
       // Filter out invalid results (pages without required fields)

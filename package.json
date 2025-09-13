@@ -36,7 +36,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prepublishOnly": "yarn build",
-    "demo": "echo \"Available demos:\n  yarn demo:hackernews - Parse Hacker News\n  yarn demo:watanoc - Parse Japanese learning site\n  yarn demo:otakudesu - Parse Indonesian anime site (Otakudesu)\n  yarn demo:proxy - Proxy and User Agent demo\n  yarn demo:response - HtmlFetchResponse demo\n  yarn demo:ssl - SSL and Dead Domain handling demo\n  yarn demo:ssl-options - SSL Configuration Options demo\n  yarn demo:typed - TypeScript Generic Types demo\n  yarn demo:transform-pipes  - Advanced Transform Pipes demo\n  yarn demo:bmw-sg - Parse BMW-SG Forum\n  yarn demo:all - Run all demos\n\nVerbose mode (shows detailed errors):\n  yarn demo:hackernews:verbose\n  yarn demo:watanoc:verbose\n  yarn demo:otakudesu:verbose\n  yarn demo:proxy:verbose\n  yarn demo:response:verbose\n  yarn demo:ssl:verbose\n  yarn demo:ssl-options:verbose\n  yarn demo:typed:verbose\n  yarn demo:transform-pipes:verbose\n  yarn demo:bmw-sg:verbose\"",
+    "demo": "echo \"Available demos:\n  yarn demo:hackernews - Parse Hacker News\n  yarn demo:watanoc - Parse Japanese learning site\n  yarn demo:otakudesu - Parse Indonesian anime site (Otakudesu)\n  yarn demo:proxy - Proxy and User Agent demo\n  yarn demo:response - HtmlFetchResponse demo\n  yarn demo:ssl - SSL and Dead Domain handling demo\n  yarn demo:ssl-options - SSL Configuration Options demo\n  yarn demo:typed - TypeScript Generic Types demo\n  yarn demo:transform-pipes  - Advanced Transform Pipes demo\n  yarn demo:bmw-sg - Parse BMW-SG Forum\n  yarn demo:sharejunction - Parse ShareJunction Forum with transform pipes\n  yarn demo:all - Run all demos\n\nVerbose mode (shows detailed errors):\n  yarn demo:hackernews:verbose\n  yarn demo:watanoc:verbose\n  yarn demo:otakudesu:verbose\n  yarn demo:proxy:verbose\n  yarn demo:response:verbose\n  yarn demo:ssl:verbose\n  yarn demo:ssl-options:verbose\n  yarn demo:typed:verbose\n  yarn demo:transform-pipes:verbose\n  yarn demo:bmw-sg:verbose\n  yarn demo:sharejunction:verbose\"",
     "demo:hackernews": "ts-node src/examples/news.ycombinator.com.ts",
     "demo:watanoc": "ts-node src/examples/watanoc.com.ts",
     "demo:otakudesu": "ts-node src/examples/otakudesu.cloud.ts",
@@ -47,6 +47,7 @@
     "demo:typed": "ts-node src/examples/typed-extraction.ts",
     "demo:transform-pipes": "ts-node src/examples/advanced-transform-pipes.ts",
     "demo:bmw-sg": "ts-node src/examples/bmw-sg.com.ts",
+    "demo:sharejunction": "ts-node src/examples/sharejunction.com.ts",
     "demo:pagination": "ts-node src/examples/pagination-validation.ts",
     "demo:hackernews:verbose": "ts-node src/examples/news.ycombinator.com.ts --verbose",
     "demo:watanoc:verbose": "ts-node src/examples/watanoc.com.ts --verbose",
@@ -58,8 +59,9 @@
     "demo:typed:verbose": "ts-node src/examples/typed-extraction.ts --verbose",
     "demo:transform-pipes:verbose": "ts-node src/examples/advanced-transform-pipes.ts --verbose",
     "demo:bmw-sg:verbose": "ts-node src/examples/bmw-sg.com.ts --verbose",
+    "demo:sharejunction:verbose": "ts-node src/examples/sharejunction.com.ts --verbose",
     "demo:pagination:verbose": "ts-node src/examples/pagination-validation.ts --verbose",
-    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:otakudesu && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response && echo '\n\n' && yarn demo:ssl && echo '\n\n' && yarn demo:typed && echo '\n\n' && yarn demo:transform-pipes && echo '\n\n' && yarn demo:pagination"
+    "demo:all": "yarn demo:hackernews && echo '\n\n' && yarn demo:watanoc && echo '\n\n' && yarn demo:otakudesu && echo '\n\n' && yarn demo:proxy && echo '\n\n' && yarn demo:response && echo '\n\n' && yarn demo:ssl && echo '\n\n' && yarn demo:typed && echo '\n\n' && yarn demo:transform-pipes && echo '\n\n' && yarn demo:sharejunction && echo '\n\n' && yarn demo:pagination"
   },
   "dependencies": {
     "@ahmedrangel/rand-user-agent": "^2.0.23",
