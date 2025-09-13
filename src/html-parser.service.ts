@@ -1251,6 +1251,133 @@ export class HtmlParserService {
   }
 
   /**
+   * Extract structured data directly from a container node (preserves XPath context)
+   *
+   * This method works directly with DOM nodes to preserve the XPath evaluation context,
+   * allowing relative XPath expressions like './td[2]//a/@href' to work correctly.
+   *
+   * @param containerNode - The DOM node to extract data from
+   * @param schema - Schema object defining fields to extract
+   * @param options - Parsing options
+   */
+  private extractStructuredFromNode<T = Record<string, any>>(
+    containerNode: Node,
+    schema: ExtractionSchema<T>,
+    options?: { verbose?: boolean; baseUrl?: string },
+  ): T {
+    const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
+    const baseUrl = options?.baseUrl;
+    const result: Record<string, any> = {};
+
+    if (verbose) {
+      this.logWithLevel(
+        'debug',
+        `🔍 extractStructuredFromNode - Processing ${Object.keys(schema).length} schema fields`,
+      );
+    }
+
+    try {
+      for (const [key, config] of Object.entries(schema)) {
+        try {
+          let value: any;
+          const raw = config.raw === true;
+
+          if (config.multiple) {
+            // Use extractMultiple for array fields
+            if (config.type === 'xpath') {
+              value = this.extractMultipleXPathFromNode(
+                containerNode,
+                config.selector,
+                config.attribute,
+                verbose,
+                raw,
+              );
+            } else {
+              // CSS selectors need to work with HTML string
+              const containerHTML = this.getElementHTML(containerNode);
+              if (raw) {
+                value = this.extractMultipleCSS(
+                  containerHTML,
+                  config.selector,
+                  undefined,
+                  true,
+                );
+              } else {
+                value = this.extractMultipleCSS(
+                  containerHTML,
+                  config.selector,
+                  config.attribute,
+                );
+              }
+            }
+            // Apply transformation if provided
+            const transform = config.transform;
+            if (transform) {
+              value = this.applyTransform(value, transform, baseUrl);
+            }
+          } else {
+            // Use extractSingle for single value fields
+            if (config.type === 'xpath') {
+              value = this.extractSingleXPathFromNode(
+                containerNode,
+                config.selector,
+                config.attribute,
+                verbose,
+                raw,
+              );
+            } else {
+              // CSS selectors need to work with HTML string
+              const containerHTML = this.getElementHTML(containerNode);
+              if (raw) {
+                value = this.extractSingleCSS(
+                  containerHTML,
+                  config.selector,
+                  undefined,
+                  true,
+                );
+              } else {
+                value = this.extractSingleCSS(
+                  containerHTML,
+                  config.selector,
+                  config.attribute,
+                );
+              }
+            }
+            // Apply transformation if provided
+            if (value && config.transform) {
+              value = this.applyTransform(value, config.transform, baseUrl);
+            }
+          }
+
+          result[key] = value;
+
+          if (verbose) {
+            this.logWithLevel(
+              'debug',
+              `✅ Extracted field '${key}': ${value ? 'success' : 'null/empty'}`,
+            );
+          }
+        } catch (error) {
+          if (this.shouldLog('error')) {
+            this.logWithLevel(
+              'error',
+              `❌ Error extracting field '${key}':`,
+              error,
+            );
+          }
+          result[key] = config.multiple ? [] : null;
+        }
+      }
+    } catch (error) {
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', '❌ Error in extractStructuredFromNode:', error);
+      }
+    }
+
+    return result as T;
+  }
+
+  /**
    * Extract array of structured data from repeating HTML elements
    *
    * For each container, applies the schema as in extractStructured. If a schema field
@@ -1376,8 +1503,8 @@ export class HtmlParserService {
           );
         }
 
-        const containerHTML = this.getElementHTML(container);
-        const item = this.extractStructured<T>(containerHTML, schema, {
+        // Extract data directly from the container node to preserve XPath context
+        const item = this.extractStructuredFromNode<T>(container, schema, {
           verbose,
           baseUrl,
         });
@@ -1512,7 +1639,132 @@ export class HtmlParserService {
     }
   }
 
-  // Private helper methods
+  // Private helper methods for node-based XPath extraction
+
+  /**
+   * Extract single value from a container node using XPath (preserves context)
+   */
+  private extractSingleXPathFromNode(
+    containerNode: Node,
+    selector: string,
+    attribute?: string,
+    verbose = false,
+    raw = false,
+  ): string | null {
+    try {
+      // Get the document from the container node
+      const document = containerNode.ownerDocument || (containerNode as Document);
+      
+      // Evaluate XPath relative to the container node
+      const result = document.evaluate(
+        selector,
+        containerNode,
+        null,
+        9, // XPathResult.FIRST_ORDERED_NODE_TYPE
+        null,
+      );
+
+      const node = result.singleNodeValue;
+      if (!node) return null;
+
+      if (raw && (node as any).outerHTML) {
+        return (node as any).outerHTML;
+      }
+
+      // Handle attribute extraction
+      if (attribute && node.nodeType === 1) { // Node.ELEMENT_NODE
+        return (node as Element).getAttribute(attribute);
+      }
+
+      // Handle attribute nodes (from XPath like '@href')
+      if (node.nodeType === 2) { // Node.ATTRIBUTE_NODE
+        return (node as Attr).value;
+      }
+
+      // Handle text nodes
+      if (node.nodeType === 3) { // Node.TEXT_NODE
+        return node.nodeValue?.trim() || null;
+      }
+
+      // Handle element nodes
+      if (node.nodeType === 1) { // Node.ELEMENT_NODE
+        if (attribute) {
+          return (node as Element).getAttribute(attribute);
+        }
+        return (node as Element).textContent?.trim() || null;
+      }
+
+      return node.textContent?.trim() || null;
+    } catch (error) {
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'Error in extractSingleXPathFromNode:', error);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Extract multiple values from a container node using XPath (preserves context)
+   */
+  private extractMultipleXPathFromNode(
+    containerNode: Node,
+    selector: string,
+    attribute?: string,
+    verbose = false,
+    raw = false,
+  ): string[] {
+    try {
+      const results: string[] = [];
+      
+      // Get the document from the container node
+      const document = containerNode.ownerDocument || (containerNode as Document);
+      
+      // Evaluate XPath relative to the container node
+      const result = document.evaluate(
+        selector,
+        containerNode,
+        null,
+        7, // XPathResult.ORDERED_NODE_SNAPSHOT_TYPE
+        null,
+      );
+
+      for (let i = 0; i < result.snapshotLength; i++) {
+        const node = result.snapshotItem(i);
+        if (!node) continue;
+
+        let value: string | null = null;
+
+        if (raw && (node as any).outerHTML) {
+          value = (node as any).outerHTML;
+        } else if (attribute && node.nodeType === 1) { // Node.ELEMENT_NODE
+          value = (node as Element).getAttribute(attribute);
+        } else if (node.nodeType === 2) { // Node.ATTRIBUTE_NODE
+          value = (node as Attr).value;
+        } else if (node.nodeType === 3) { // Node.TEXT_NODE
+          value = node.nodeValue?.trim() || null;
+        } else if (node.nodeType === 1) { // Node.ELEMENT_NODE
+          if (attribute) {
+            value = (node as Element).getAttribute(attribute);
+          } else {
+            value = (node as Element).textContent?.trim() || null;
+          }
+        } else {
+          value = node.textContent?.trim() || null;
+        }
+
+        if (value) {
+          results.push(value);
+        }
+      }
+
+      return results;
+    } catch (error) {
+      if (this.shouldLog('error')) {
+        this.logWithLevel('error', 'Error in extractMultipleXPathFromNode:', error);
+      }
+      return [];
+    }
+  }
 
   private getElementHTML(element: any): string {
     if (!element) return '';
@@ -1976,8 +2228,8 @@ export class HtmlParserService {
     html: string,
     containerSelector: string,
     containerType: 'xpath' | 'css' = 'xpath',
-    options?: { 
-      verbose?: boolean; 
+    options?: {
+      verbose?: boolean;
       baseUrl?: string;
       schema?: ExtractionSchema<T>;
       linkSelector?: string;
@@ -1986,12 +2238,16 @@ export class HtmlParserService {
     const verbose = options?.verbose ?? this.defaultOptions.verbose ?? false;
     const baseUrl = options?.baseUrl;
     const customSchema = options?.schema;
-    const linkSelector = options?.linkSelector || (containerType === 'xpath' ? './/a' : 'a');
+    const linkSelector =
+      options?.linkSelector || (containerType === 'xpath' ? './/a' : 'a');
 
     // Validate containerSelector
     if (!containerSelector || typeof containerSelector !== 'string') {
       if (this.shouldLog('error')) {
-        this.logWithLevel('error', `Invalid containerSelector provided: ${containerSelector}`);
+        this.logWithLevel(
+          'error',
+          `Invalid containerSelector provided: ${containerSelector}`,
+        );
       }
       return [];
     }
@@ -2013,14 +2269,14 @@ export class HtmlParserService {
           containerSelector,
           customSchema,
           containerType,
-          { verbose, baseUrl }
+          { verbose, baseUrl },
         );
       } else {
         // Extract all links from the container directly
         if (verbose) {
           this.logWithLevel(
             'debug',
-            `📎 Using default link extraction with selector: "${linkSelector}"`
+            `📎 Using default link extraction with selector: "${linkSelector}"`,
           );
         }
 
@@ -2030,41 +2286,54 @@ export class HtmlParserService {
 
         if (containerType === 'xpath') {
           // Use the container as the context and find all links within it
-          const containers = this.evaluateXPath(html, containerSelector, verbose);
+          const containers = this.evaluateXPath(
+            html,
+            containerSelector,
+            verbose,
+          );
           const allLinks: { href: string; text: string }[] = [];
 
           for (const container of containers) {
             const containerHTML = this.getElementHTML(container);
-            
+
             // Get all anchor elements first
-            const anchorElements = this.evaluateXPath(containerHTML, linkSelector, verbose);
-            
+            const anchorElements = this.evaluateXPath(
+              containerHTML,
+              linkSelector,
+              verbose,
+            );
+
             // Extract href and text from each anchor element individually
             for (const anchorElement of anchorElements) {
-              const href = (anchorElement as any).getAttribute ? (anchorElement as any).getAttribute('href') : null;
-              const text = (anchorElement as any).textContent || (anchorElement as any).innerText || '';
-              
+              const href = (anchorElement as any).getAttribute
+                ? (anchorElement as any).getAttribute('href')
+                : null;
+              const text =
+                (anchorElement as any).textContent ||
+                (anchorElement as any).innerText ||
+                '';
+
               // Only include links that have both href and text
               if (href && href.trim() !== '' && text && text.trim() !== '') {
-                allLinks.push({ 
-                  href: href.trim(), 
-                  text: text.trim() 
+                allLinks.push({
+                  href: href.trim(),
+                  text: text.trim(),
                 });
               }
             }
           }
 
-          linkElements = allLinks.map(link => link.href);
-          linkTexts = allLinks.map(link => link.text);
+          linkElements = allLinks.map((link) => link.href);
+          linkTexts = allLinks.map((link) => link.text);
         } else {
           // For CSS selectors, extract from the entire HTML
           const $ = require('cheerio').load(html);
           const container = $(containerSelector);
           const links = container.find(linkSelector);
-          
+
           linkElements = [];
           linkTexts = [];
-          
+
           links.each((_: number, element: any) => {
             const $element = $(element);
             const href = $element.attr('href');
@@ -2078,7 +2347,11 @@ export class HtmlParserService {
 
         // Transform results to PaginationPage format and apply baseUrl if needed
         const pageResults: PaginationPage[] = [];
-        for (let i = 0; i < Math.min(linkElements.length, linkTexts.length); i++) {
+        for (
+          let i = 0;
+          i < Math.min(linkElements.length, linkTexts.length);
+          i++
+        ) {
           let href = linkElements[i];
           const text = linkTexts[i];
 
@@ -2100,21 +2373,23 @@ export class HtmlParserService {
       }
 
       // Filter out invalid results (pages without required fields)
-      const validResults = results.filter(page => {
+      const validResults = results.filter((page) => {
         if (customSchema) {
           // For custom schema, just check if the object has some content
           return page && typeof page === 'object';
         } else {
           // For default pagination, check href and text
           const p = page as unknown as PaginationPage;
-          return p.href && p.href.trim() !== '' && p.text && p.text.trim() !== '';
+          return (
+            p.href && p.href.trim() !== '' && p.text && p.text.trim() !== ''
+          );
         }
       });
 
       if (verbose) {
         this.logWithLevel(
           'debug',
-          `🎯 extractPagination completed: ${validResults.length} valid pages extracted`
+          `🎯 extractPagination completed: ${validResults.length} valid pages extracted`,
         );
       }
 
@@ -2129,10 +2404,10 @@ export class HtmlParserService {
 
   /**
    * Extract the origin (protocol + hostname + port) from a URL
-   * 
+   *
    * @param url - Full URL string
    * @returns Origin string (e.g., "https://example.com")
-   * 
+   *
    * @example
    * ```typescript
    * const origin = parser.getOrigin('https://www.bmw-sg.com/forums/forums/introduction-greetings.24/page-5');
@@ -2168,9 +2443,7 @@ export class HtmlParserService {
 
     const isClass = (t: any) => {
       return (
-        typeof t === 'function' &&
-        t.prototype &&
-        t.prototype.constructor === t
+        typeof t === 'function' && t.prototype && t.prototype.constructor === t
       );
     };
 
@@ -2181,40 +2454,51 @@ export class HtmlParserService {
       );
     };
 
-    const executeTransform = (val: any, t: any, currentBaseUrl?: string): any => {
+    const executeTransform = (
+      val: any,
+      t: any,
+      currentBaseUrl?: string,
+    ): any => {
       val = toText(val); // Always convert to string if possible before transform
-      
+
       // Handle function format: (value) => transformedValue
       if (typeof t === 'function') {
         return t(val);
       }
-      
+
       // Handle object format: { class: SomeClass, payload?: {...} }
       if (t && typeof t === 'object' && t.class && isPipeClass(t.class)) {
         const instance = new t.class();
-        
+
         // Apply payload configuration if provided
         if (t.payload && typeof t.payload === 'object') {
           Object.assign(instance, t.payload);
         }
-        
+
         // Set baseUrl if the instance supports it and we have one
-        if (currentBaseUrl && ('baseUrl' in instance || instance.hasOwnProperty('baseUrl'))) {
+        if (
+          currentBaseUrl &&
+          ('baseUrl' in instance || instance.hasOwnProperty('baseUrl'))
+        ) {
           instance.baseUrl = currentBaseUrl;
         }
-        
+
         // Call transform method
         if (typeof instance.transform === 'function') {
           return instance.transform(val);
         }
-        
+
         return val;
       }
-      
+
       return val;
     };
 
-    const applyToValue = (val: any, transforms: any, currentBaseUrl?: string): any => {
+    const applyToValue = (
+      val: any,
+      transforms: any,
+      currentBaseUrl?: string,
+    ): any => {
       if (Array.isArray(transforms)) {
         // Chain transforms: output of one becomes input of next, maintaining baseUrl context
         return transforms.reduce((acc, t) => {
