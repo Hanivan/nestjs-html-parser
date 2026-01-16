@@ -1,6 +1,22 @@
 /**
  * @fileoverview NestJS HTML Parser Package
  *
+ * ⚠️⚠️⚠️ DEPRECATED PACKAGE ⚠️⚠️⚠️
+ *
+ * This package is ARCHIVED and NO LONGER MAINTAINED.
+ *
+ * Please migrate to the new package: @hanivanrizky/nestjs-xpath-parser
+ * https://github.com/Hanivan/nestjs-xpath-parser
+ *
+ * Migration:
+ * 1. npm uninstall @hanivanrizky/nestjs-html-parser
+ * 2. npm install @hanivanrizky/nestjs-xpath-parser
+ * 3. Update imports: '@hanivanrizky/nestjs-html-parser' → '@hanivanrizky/nestjs-xpath-parser'
+ *
+ * For details, see: https://github.com/Hanivan/nestjs-html-parser/blob/main/DEPRECATED.md
+ *
+ * ---------------------------------------------------------------
+ *
  * A powerful NestJS package for parsing HTML content with comprehensive features:
  *
  * ## Features

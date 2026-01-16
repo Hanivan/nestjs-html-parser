@@ -1,3 +1,26 @@
+# ⚠️ **IMPORTANT: This package is archived and no longer maintained**
+
+> **This package has been renamed and migrated.** Please use the new package instead:
+> **[@hanivanrizky/nestjs-xpath-parser](https://github.com/Hanivan/nestjs-xpath-parser)**
+>
+> This repository is kept for historical reference only. No updates, bug fixes, or support will be provided.
+
+## Migration Guide
+
+### Old Package (Archived)
+```bash
+npm uninstall @hanivanrizky/nestjs-html-parser
+```
+
+### New Package (Active)
+```bash
+npm install @hanivanrizky/nestjs-xpath-parser
+```
+
+The new package has improved features, better documentation, and active maintenance.
+
+---
+
 # @hanivanrizky/nestjs-html-parser
 
 <p align="center">
