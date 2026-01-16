@@ -1,6 +1,6 @@
 {
   "name": "@hanivanrizky/nestjs-html-parser",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "⚠️ ARCHIVED - This package is no longer maintained. Please migrate to @hanivanrizky/nestjs-xpath-parser (https://github.com/Hanivan/nestjs-xpath-parser)",
   "author": "Hanivan Rizky Sobari <hanivan20@gmail.com>",
   "private": false,
